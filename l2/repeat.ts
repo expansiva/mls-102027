@@ -5,8 +5,8 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { ChildPart, noChange } from '/_100000_/litHtml.js';
-import { Directive, PartInfo } from '/_100000_/directive.js';
+import { ChildPart, noChange } from '/_102027_/litHtml.js';
+import { Directive, PartInfo } from '/_102027_/directive.js';
 export type KeyFn<T> = (item: T, index: number) => unknown;
 export type ItemTemplate<T> = (item: T, index: number) => unknown;
 declare class RepeatDirective extends Directive {
