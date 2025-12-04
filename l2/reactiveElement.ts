@@ -30,7 +30,7 @@ export declare namespace ReactiveUnstable {
      * making certain operations that are normally very cheap (like a no-op render) much slower,
      * because we must copy data and dispatch events.
      */
-    namespace DebugLog {
+    export namespace DebugLog {
         type Entry = Update;
         interface Update {
             kind: 'update';

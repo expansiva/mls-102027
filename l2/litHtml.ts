@@ -23,7 +23,7 @@ export declare namespace LitUnstable {
      * making certain operations that are normally very cheap (like a no-op render) much slower,
      * because we must copy data and dispatch events.
      */
-    namespace DebugLog {
+    export namespace DebugLog {
         type Entry = TemplatePrep | TemplateInstantiated | TemplateInstantiatedAndUpdated | TemplateUpdating | BeginRender | EndRender | CommitPartEntry | SetPartValue;
         interface TemplatePrep {
             kind: 'template prep';
