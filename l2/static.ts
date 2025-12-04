@@ -5,7 +5,7 @@
  * Copyright 2020 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { html as coreHtml, svg as coreSvg, mathml as coreMathml, TemplateResult } from '/_100000_/litHtml.js';
+import { html as coreHtml, svg as coreSvg, mathml as coreMathml, TemplateResult } from '/_102027_/litHtml.js';
 export interface StaticValue {
     /** The value to interpolate as-is into the template. */
     _$litStatic$: string;
