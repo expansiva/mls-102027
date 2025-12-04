@@ -5,8 +5,8 @@
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { Part } from '/_100000_/litHtml.js';
-import { Directive, DirectiveParameters } from '/_100000_/directive.js';
+import { Part } from '/_102027_/litHtml.js';
+import { Directive, DirectiveParameters } from '/_102027_/directive.js';
 declare class GuardDirective extends Directive {
     private _previousValue;
     render(_value: unknown, f: () => unknown): unknown;
@@ -53,7 +53,7 @@ declare class GuardDirective extends Directive {
  * @param value the value to check before re-rendering
  * @param f the template function
  */
-export declare const guard: (_value: unknown, f: () => unknown) => import("/_100000_/directive.js").DirectiveResult<typeof GuardDirective>;
+export declare const guard: (_value: unknown, f: () => unknown) => import("/_102027_/directive.js").DirectiveResult<typeof GuardDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.
