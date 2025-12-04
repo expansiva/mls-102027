@@ -10,10 +10,10 @@
  * {@link ReactiveElement}.
  * @packageDocumentation
  */
-import { CSSResultGroup, CSSResultOrNative } from '/_100000_cssTag.js';
-import type { ReactiveController, ReactiveControllerHost } from '/_100000_reactiveController.js';
-export * from '/_100000_cssTag.js';
-export type { ReactiveController, ReactiveControllerHost, } from '/_100000_reactiveController.js';
+import { CSSResultGroup, CSSResultOrNative } from '/_102027_cssTag.js';
+import type { ReactiveController, ReactiveControllerHost } from '/_102027_reactiveController.js';
+export * from '/_102027_cssTag.js';
+export type { ReactiveController, ReactiveControllerHost, } from '/_102027_reactiveController.js';
 /**
  * Contains types that are part of the unstable debug API.
  *
