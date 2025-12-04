@@ -5,7 +5,7 @@
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { Directive, ChildPart, DirectiveParameters } from '/_100000_/directive.js';
+import { Directive, ChildPart, DirectiveParameters } from '/_102027_/directive.js';
 declare class Keyed extends Directive {
     key: unknown;
     render(k: unknown, v: unknown): unknown;
@@ -20,7 +20,7 @@ declare class Keyed extends Directive {
  * with code that expects new data to generate new HTML elements, such as some
  * animation techniques.
  */
-export declare const keyed: (k: unknown, v: unknown) => import("/_100000_/directive.js").DirectiveResult<typeof Keyed>;
+export declare const keyed: (k: unknown, v: unknown) => import("/_102027_/directive.js").DirectiveResult<typeof Keyed>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.
