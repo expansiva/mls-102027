@@ -5,12 +5,13 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { ReactiveElement } from '/_102027_/reactiveElement.js';
-import { type Interface } from '/_102027_/base.js';
+import type { ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import { type Interface } from '/_102027_/l2/base.js';
 export type QueryAsyncDecorator = {
     (proto: Interface<ReactiveElement>, name: PropertyKey, descriptor?: PropertyDescriptor): void | any;
     <C extends Interface<ReactiveElement>, V extends Promise<Element | null>>(value: ClassAccessorDecoratorTarget<C, V>, context: ClassAccessorDecoratorContext<C, V>): ClassAccessorDecoratorResult<C, V>;
 };
+
 /**
  * A property decorator that converts a class property into a getter that
  * returns a promise that resolves to the result of a querySelector on the
