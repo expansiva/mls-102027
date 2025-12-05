@@ -21,5 +21,7 @@
  * }
  * ```
  */
+
+
 export declare function map<T>(items: Iterable<T> | undefined, f: (value: T, index: number) => unknown): Generator<unknown, void, unknown>;
 //# sourceMappingURL=map.d.ts.map
