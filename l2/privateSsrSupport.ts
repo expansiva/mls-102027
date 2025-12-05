@@ -5,9 +5,9 @@
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { Directive, PartInfo, DirectiveClass, DirectiveResult } from '/_102027_directive.js';
-import { AttributePart, Part, Disconnectable } from '/_102027_/litHtml.js';
-import type { PropertyPart, ChildPart, BooleanAttributePart, EventPart, ElementPart, TemplateInstance } from '/_102027_/litHtml.js';
+import { Directive, PartInfo, DirectiveClass, DirectiveResult } from '/_102027_/l2/directive.js';
+import { AttributePart, Part, Disconnectable } from '/_102027_/l2/litHtml.js';
+import type { PropertyPart, ChildPart, BooleanAttributePart, EventPart, ElementPart, TemplateInstance } from '/_102027_/l2/litHtml.js';
 /**
  * END USERS SHOULD NOT RELY ON THIS OBJECT.
  *
@@ -46,7 +46,7 @@ export declare const _$LH: {
     setDirectiveClass(value: DirectiveResult, directiveClass: DirectiveClass): void;
     getAttributePartCommittedValue: (part: AttributePart, value: unknown, index: number | undefined) => unknown;
     connectedDisconnectable: (props?: object) => Disconnectable;
-    resolveDirective: (part: ChildPart | AttributePart | ElementPart, value: unknown, parent?: import("/_102027_/litHtml.js").DirectiveParent, attributeIndex?: number) => unknown;
+    resolveDirective: (part: ChildPart | AttributePart | ElementPart, value: unknown, parent?: import("/_102027_/l2/litHtml.js").DirectiveParent, attributeIndex?: number) => unknown;
     AttributePart: typeof AttributePart;
     PropertyPart: typeof PropertyPart;
     BooleanAttributePart: typeof BooleanAttributePart;
