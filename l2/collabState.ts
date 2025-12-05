@@ -1,5 +1,6 @@
 /// <mls shortName="collabState" project="102027" enhancement="_blank" />
 
+
 /**
  * Returns the value for a given state key.
  * @param key State key in dot notation.
