@@ -5,9 +5,9 @@
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { ReactiveElement } from '/_102027_/reactiveElement.js';
-import type { QueryAssignedNodesOptions } from '/_102027_/queryAssignedNodes.js';
-import { type Interface } from '/_102027_/base.js';
+import type { ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import type { QueryAssignedNodesOptions } from '/_102027_/l2/queryAssignedNodes.js';
+import { type Interface } from '/_102027_/l2/base.js';
 export type QueryAssignedElementsDecorator = {
     (proto: Interface<ReactiveElement>, name: PropertyKey, descriptor?: PropertyDescriptor): void | any;
     <C extends Interface<ReactiveElement>, V extends Array<Element>>(value: ClassAccessorDecoratorTarget<C, V>, context: ClassAccessorDecoratorContext<C, V>): ClassAccessorDecoratorResult<C, V>;
@@ -24,6 +24,7 @@ export interface QueryAssignedElementsOptions extends QueryAssignedNodesOptions 
      */
     selector?: string;
 }
+
 /**
  * A property decorator that converts a class property into a getter that
  * returns the `assignedElements` of the given `slot`. Provides a declarative
