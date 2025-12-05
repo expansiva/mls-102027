@@ -5,8 +5,8 @@
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { AttributePart, noChange } from '/_102027_/litHtml.js';
-import { Directive, DirectiveParameters, PartInfo } from '/_102027_/directive.js';
+import { AttributePart, noChange } from '/_102027_/l2/litHtml.js';
+import { Directive, DirectiveParameters, PartInfo } from '/_102027_/l2/directive.js';
 /**
  * A key-value set of CSS properties and values.
  *
@@ -43,7 +43,7 @@ declare class StyleMapDirective extends Directive {
  * @param styleInfo
  * @see {@link https://lit.dev/docs/templates/directives/#stylemap styleMap code samples on Lit.dev}
  */
-export declare const styleMap: (styleInfo: Readonly<StyleInfo>) => import("/_102027_/directive.js").DirectiveResult<typeof StyleMapDirective>;
+export declare const styleMap: (styleInfo: Readonly<StyleInfo>) => import("/_102027_/l2/directive.js").DirectiveResult<typeof StyleMapDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.
