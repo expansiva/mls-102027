@@ -5,8 +5,9 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { ReactiveElement } from '/_102027_/reactiveElement.js';
-import type { Interface } from '/_102027_/base.js';
+import type { ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import type { Interface } from '/_102027_/l2/base.js';
+
 export type EventOptionsDecorator = {
     (proto: Interface<ReactiveElement>, name: PropertyKey): void | any;
     <C, V extends (this: C, ...args: any) => any>(value: V, _context: ClassMethodDecoratorContext<C, V>): void;
