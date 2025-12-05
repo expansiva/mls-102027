@@ -5,7 +5,7 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { UnsafeHTMLDirective } from '/_102027_/unsafeHtml.js';
+import { UnsafeHTMLDirective } from '/_102027_/l2/unsafeHtml.js';
 declare class UnsafeSVGDirective extends UnsafeHTMLDirective {
     static directiveName: string;
     static resultType: number;
@@ -20,7 +20,7 @@ declare class UnsafeSVGDirective extends UnsafeHTMLDirective {
  * sanitized or escaped, as it may lead to cross-site-scripting
  * vulnerabilities.
  */
-export declare const unsafeSVG: (value: string | typeof import('/_102027_/litHtml.js').noChange | typeof import("/_102027_/litHtml.js").nothing | null | undefined) => import("/_102027_/directive.js").DirectiveResult<typeof UnsafeSVGDirective>;
+export declare const unsafeSVG: (value: string | typeof import('/_102027_/l2/litHtml.js').noChange | typeof import("/_102027_/l2/litHtml.js").nothing | null | undefined) => import("/_102027_/l2/directive.js").DirectiveResult<typeof UnsafeSVGDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.
