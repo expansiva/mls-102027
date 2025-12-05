@@ -5,6 +5,7 @@
  * Copyright 2021 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
+
 /**
  * Helper to iterate an AsyncIterable in its own closure.
  * @param iterable The iterable to iterate
