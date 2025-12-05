@@ -5,7 +5,7 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { Constructor } from '/_102027_/base.js';
+import type { Constructor } from '/_102027_/l2/base.js';
 /**
  * Allow for custom element classes with private constructors
  */
