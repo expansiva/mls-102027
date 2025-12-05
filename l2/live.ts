@@ -5,8 +5,9 @@
  * Copyright 2020 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { AttributePart } from '/_102027_/litHtml.js';
-import { Directive, DirectiveParameters, PartInfo } from '/_102027_/directive.js';
+import { AttributePart } from '/_102027_/l2/litHtml.js';
+import { Directive, DirectiveParameters, PartInfo } from '/_102027_/l2/directive.js';
+
 declare class LiveDirective extends Directive {
     constructor(partInfo: PartInfo);
     render(value: unknown): unknown;
@@ -36,7 +37,7 @@ declare class LiveDirective extends Directive {
  * you use `live()` with an attribute binding, make sure that only strings are
  * passed in, or the binding will update every render.
  */
-export declare const live: (value: unknown) => import("/_102027_/directive.js").DirectiveResult<typeof LiveDirective>;
+export declare const live: (value: unknown) => import("/_102027_/l2/directive.js").DirectiveResult<typeof LiveDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.
