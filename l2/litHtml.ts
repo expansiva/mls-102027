@@ -5,7 +5,7 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { Directive } from '/_102027_directive.js';
+import type { Directive } from '/_102027_/l2/directive.js';
 
 /**
  * Contains types that are part of the unstable debug API.

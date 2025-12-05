@@ -5,8 +5,9 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { type PropertyDeclaration, type ReactiveElement } from '/_102027_/reactiveElement.js';
-import type { Interface } from '/_102027_/base.js';
+import { type PropertyDeclaration, type ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import type { Interface } from '/_102027_/l2/base.js';
+
 export type PropertyDecorator = {
     <C extends Interface<ReactiveElement>, V>(target: ClassAccessorDecoratorTarget<C, V>, context: ClassAccessorDecoratorContext<C, V>): ClassAccessorDecoratorResult<C, V>;
     <C extends Interface<ReactiveElement>, V>(target: (value: V) => void, context: ClassSetterDecoratorContext<C, V>): (this: C, value: V) => void;

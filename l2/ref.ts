@@ -5,8 +5,8 @@
  * Copyright 2020 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { ElementPart } from '/_102027_/litHtml.js';
-import { AsyncDirective } from '/_102027_/asyncDirective.js';
+import { ElementPart } from '/_102027_/l2/litHtml.js';
+import { AsyncDirective } from '/_102027_/l2/asyncDirective.js';
 /**
  * Creates a new Ref object, which is container for a reference to an element.
  */
@@ -59,7 +59,7 @@ declare class RefDirective extends AsyncDirective {
  * render(html`<input ${ref(callback)}>`, container);
  * ```
  */
-export declare const ref: (_ref?: RefOrCallback<Element> | undefined) => import('/_102027_/directive.js').DirectiveResult<typeof RefDirective>;
+export declare const ref: (_ref?: RefOrCallback<Element> | undefined) => import('/_102027_/l2/directive.js').DirectiveResult<typeof RefDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

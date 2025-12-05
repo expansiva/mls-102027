@@ -5,8 +5,8 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { Part } from '/_102027_/litHtml.js';
-import { AsyncDirective } from '/_102027_/asyncDirective.js';
+import { Part } from '/_102027_/l2/litHtml.js';
+import { AsyncDirective } from '/_102027_/l2/asyncDirective.js';
 export declare class UntilDirective extends AsyncDirective {
     private __lastRenderedIndex;
     private __values;
@@ -38,7 +38,7 @@ export declare class UntilDirective extends AsyncDirective {
  * html`${until(content, html`<span>Loading...</span>`)}`
  * ```
  */
-export declare const until: (...values: unknown[]) => import('/_102027_/directive.js').DirectiveResult<typeof UntilDirective>;
+export declare const until: (...values: unknown[]) => import('/_102027_/l2/directive.js').DirectiveResult<typeof UntilDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

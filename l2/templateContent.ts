@@ -5,8 +5,8 @@
  * Copyright 2020 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { noChange } from '/_102027_/litHtml.js';
-import { Directive, PartInfo }  from '/_102027_/directive.js';
+import { noChange } from '/_102027_/l2/litHtml.js';
+import { Directive, PartInfo }  from '/_102027_/l2/directive.js';
 declare class TemplateContentDirective extends Directive {
     private _previousTemplate?;
     constructor(partInfo: PartInfo);
@@ -19,7 +19,7 @@ declare class TemplateContentDirective extends Directive {
  * Rendering a user-controlled template with this directive
  * could lead to cross-site-scripting vulnerabilities.
  */
-export declare const templateContent: (template: HTMLTemplateElement) => import("/_102027_/directive.js").DirectiveResult<typeof TemplateContentDirective>;
+export declare const templateContent: (template: HTMLTemplateElement) => import("/_102027_/l2/directive.js").DirectiveResult<typeof TemplateContentDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

@@ -4,6 +4,7 @@
 import { LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { globalState } from '/_102027_/l2/collabState.js';
+
 /**
  * Class extending LitElement with CollabState functionality.
  */

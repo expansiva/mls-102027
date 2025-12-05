@@ -5,8 +5,8 @@
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { AttributePart, noChange } from '/_102027_/litHtml.js';
-import { Directive, DirectiveParameters, PartInfo } from '/_102027_/directive.js';
+import { AttributePart, noChange } from '/_102027_/l2/litHtml.js';
+import { Directive, DirectiveParameters, PartInfo } from '/_102027_/l2/directive.js';
 /**
  * A key-value set of class names to truthy values.
  */
@@ -38,7 +38,7 @@ declare class ClassMapDirective extends Directive {
  *
  * @param classInfo
  */
-export declare const classMap: (classInfo: ClassInfo) => import("/_102027_/directive.js").DirectiveResult<typeof ClassMapDirective>;
+export declare const classMap: (classInfo: ClassInfo) => import("/_102027_/l2/directive.js").DirectiveResult<typeof ClassMapDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

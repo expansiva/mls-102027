@@ -5,8 +5,8 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { ChildPart }from '/_102027_/litHtml.js';
-import { Directive, DirectiveParameters, PartInfo } from '/_102027_/directive.js';
+import { ChildPart }from '/_102027_/l2/litHtml.js';
+import { Directive, DirectiveParameters, PartInfo } from '/_102027_/l2/directive.js';
 declare class CacheDirective extends Directive {
     private _templateCache;
     private _value?;
@@ -28,7 +28,7 @@ declare class CacheDirective extends Directive {
  * `
  * ```
  */
-export declare const cache: (v: unknown) => import("/_102027_/directive.js").DirectiveResult<typeof CacheDirective>;
+export declare const cache: (v: unknown) => import("/_102027_/l2/directive.js").DirectiveResult<typeof CacheDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

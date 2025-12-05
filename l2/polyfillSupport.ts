@@ -16,5 +16,6 @@
  *
  * @packageDocumentation
  */
-export {};
+export { };
+
 //# sourceMappingURL=polyfill-support.d.ts.map

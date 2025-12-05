@@ -8,6 +8,7 @@
 /**
  * Whether the current browser supports `adoptedStyleSheets`.
  */
+
 export declare const supportsAdoptingStyleSheets: boolean;
 /**
  * A CSSResult or native CSSStyleSheet.

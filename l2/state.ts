@@ -27,5 +27,5 @@ export type InternalPropertyDeclaration<Type = unknown> = StateDeclaration<Type>
  * properties may be renamed by optimization tools like closure compiler.
  * @category Decorator
  */
-export declare function state(options?: StateDeclaration): import("/_102027_property.js").PropertyDecorator;
+export declare function state(options?: StateDeclaration): import("/_102027_/l2/property.js").PropertyDecorator;
 //# sourceMappingURL=state.d.ts.map

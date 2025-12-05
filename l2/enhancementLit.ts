@@ -1,11 +1,11 @@
 /// <mls shortName="enhancementLit" project="102027" enhancement="_blank" />
 
-import { convertFileNameToTag } from './_100554_utilsLit'
-import { getPropierties } from './_100554_propiertiesLit'
-import { getComponentDependencies } from './_100554_dependenciesLit'
-import { validateTagName, validateRender } from './_100554_validateLit'
-import { setCodeLens } from './_100554_codeLensLit'
-import { injectStyle } from './_100554_processCssLit'
+import { convertFileNameToTag } from '/_100554_/l2/utilsLit'
+import { getPropierties } from '/_100554_/l2/propiertiesLit'
+import { getComponentDependencies } from '/_100554_/l2/dependenciesLit'
+import { validateTagName, validateRender } from '/_100554_/l2/validateLit'
+import { setCodeLens } from '/_100554_/l2/codeLensLit'
+import { injectStyle } from '/_100554_/l2/processCssLit'
 
 export const requires: mls.l2.enhancement.IRequire[] = [
     {

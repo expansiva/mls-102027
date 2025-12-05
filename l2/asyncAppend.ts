@@ -5,9 +5,9 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { ChildPart } from '/_102027_/litHtml.js';
-import { DirectiveParameters, PartInfo } from '/_102027_/directive.js';
-import { AsyncReplaceDirective } from '/_102027_/asyncReplace.js';
+import { ChildPart } from '/_102027_/l2/litHtml.js';
+import { DirectiveParameters, PartInfo } from '/_102027_/l2/directive.js';
+import { AsyncReplaceDirective } from '/_102027_/l2/asyncReplace.js';
 
 declare class AsyncAppendDirective extends AsyncReplaceDirective {
     private __childPart;
@@ -34,7 +34,7 @@ declare class AsyncAppendDirective extends AsyncReplaceDirective {
  *     value. Useful for generating templates for each item in the iterable.
  */
 
-export declare const asyncAppend: (value: AsyncIterable<unknown>, _mapper?: ((v: unknown, index?: number) => unknown) | undefined) => import("/_102027_/directive.js").DirectiveResult<typeof AsyncAppendDirective>;
+export declare const asyncAppend: (value: AsyncIterable<unknown>, _mapper?: ((v: unknown, index?: number) => unknown) | undefined) => import("/_102027_/l2/directive.js").DirectiveResult<typeof AsyncAppendDirective>;
 /**
  * The type of the class that powers this directive. Necessary for naming the
  * directive's return type.

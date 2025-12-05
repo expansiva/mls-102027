@@ -9,6 +9,7 @@
  * An object that can host Reactive Controllers and call their lifecycle
  * callbacks.
  */
+
 export interface ReactiveControllerHost {
     /**
      * Adds a controller to the host, which sets up the controller's lifecycle

@@ -23,6 +23,7 @@ type Falsy = null | undefined | false | 0 | -0 | 0n | '';
  * }
  * ```
  */
+
 export declare function when<C extends Falsy, T, F = undefined>(condition: C, trueCase: (c: C) => T, falseCase?: (c: C) => F): F;
 export declare function when<C, T, F>(condition: C extends Falsy ? never : C, trueCase: (c: C) => T, falseCase?: (c: C) => F): T;
 export declare function when<C, T, F = undefined>(condition: C, trueCase: (c: Exclude<C, Falsy>) => T, falseCase?: (c: Extract<C, Falsy>) => F): C extends Falsy ? F : T;

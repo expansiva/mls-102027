@@ -5,8 +5,8 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import { ChildPart } from '/_102027_/litHtml.js';
-import { AsyncDirective, DirectiveParameters } from '/_102027_/asyncDirective.js';
+import { ChildPart } from '/_102027_/l2/litHtml.js';
+import { AsyncDirective, DirectiveParameters } from '/_102027_/l2/asyncDirective.js';
 type Mapper<T> = (v: T, index?: number) => unknown;
 export declare class AsyncReplaceDirective extends AsyncDirective {
     private __value?;
@@ -36,6 +36,6 @@ export declare class AsyncReplaceDirective extends AsyncDirective {
  * @param mapper An optional function that maps from (value, index) to another
  *     value. Useful for generating templates for each item in the iterable.
  */
-export declare const asyncReplace: (value: AsyncIterable<unknown>, _mapper?: Mapper<unknown> | undefined) => import("/_102027_/directive.js").DirectiveResult<typeof AsyncReplaceDirective>;
+export declare const asyncReplace: (value: AsyncIterable<unknown>, _mapper?: Mapper<unknown> | undefined) => import("/_102027_/l2/directive.js").DirectiveResult<typeof AsyncReplaceDirective>;
 export {};
 //# sourceMappingURL=async-replace.d.ts.map

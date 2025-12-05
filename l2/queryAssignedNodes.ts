@@ -5,12 +5,13 @@
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-import type { ReactiveElement } from '/_102027_/reactiveElement.js';
-import { type Interface } from '/_102027_/base.js';
+import type { ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import { type Interface } from '/_102027_/l2/base.js';
 /**
  * Options for the {@linkcode queryAssignedNodes} decorator. Extends the options
  * that can be passed into [HTMLSlotElement.assignedNodes](https://developer.mozilla.org/en-US/docs/Web/API/HTMLSlotElement/assignedNodes).
  */
+
 export interface QueryAssignedNodesOptions extends AssignedNodesOptions {
     /**
      * Name of the slot to query. Leave empty for the default slot.
