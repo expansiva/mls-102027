@@ -69,6 +69,7 @@ export * from '/_102027_/l2/join.js';
 export * from '/_102027_/l2/keyed.js';
 export * from '/_102027_/l2/map.js';
 export * from '/_102027_/l2/range.js';
+export * from '/_102027_/l2/repeat.js';
 export * from '/_102027_/l2/ref.js';
 export * from '/_102027_/l2/templateContent.js';
 export * from '/_102027_/l2/unsafeHtml.js';
