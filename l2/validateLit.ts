@@ -1,7 +1,7 @@
 /// <mls shortName="validateLit" project="102027" enhancement="_blank" />
 
 import type { IDecoratorDictionary, IDecoratorDetails, IDecoratorClassInfo } from '/_102027_/l2/propiertiesLit.js';
-import { convertFileNameToTag } from '/_102027_/l2/utils.js';
+import { convertFileNameToTag, setErrorOnModel } from '/_102027_/l2/utils.js';
 
 export function validateTagName(modelTS: mls.editor.IModelTS): boolean {
 
@@ -66,29 +66,6 @@ function getDecoratorClassInfo(decoratorString: string): IDecoratorClassInfo | u
     }
     return result;
 }
-
-function getLineIndent(model: monaco.editor.ITextModel, lineNumber: number): number {
-    if (model) {
-        var lineContent = model.getLineContent(lineNumber);
-        var match = lineContent.match(/^\s*/);
-        return match ? match[0].length : 0;
-    }
-    return 0;
-}
-
-export function setErrorOnModel(model: monaco.editor.ITextModel, line: number, startColumn: number, endColumn: number, message: string, severity: monaco.MarkerSeverity): void {
-    const lineIndent = getLineIndent(model, line)
-    const markerOptions = {
-        severity,
-        message,
-        startLineNumber: line,
-        startColumn: startColumn + lineIndent,
-        endLineNumber: line,
-        endColumn: endColumn + lineIndent,
-    };
-    monaco.editor.setModelMarkers(model, 'markerSource', [markerOptions]);
-}
-
 
 function clearErrorsOnModel(model: monaco.editor.ITextModel) {
     monaco.editor.setModelMarkers(model, 'markerSource', []);
