@@ -38,3 +38,27 @@ export function convertFileNameToTag(info: {
     return `${folderPrefix}${baseName}`;
 }
 
+
+export function setErrorOnModel(model: monaco.editor.ITextModel, line: number, startColumn: number, endColumn: number, message: string, severity: monaco.MarkerSeverity): void {
+    const lineIndent = getLineIndent(model, line)
+    const markerOptions = {
+        severity,
+        message,
+        startLineNumber: line,
+        startColumn: startColumn + lineIndent,
+        endLineNumber: line,
+        endColumn: endColumn + lineIndent,
+    };
+    monaco.editor.setModelMarkers(model, 'markerSource', [markerOptions]);
+}
+
+function getLineIndent(model: monaco.editor.ITextModel, lineNumber: number): number {
+    if (model) {
+        var lineContent = model.getLineContent(lineNumber);
+        var match = lineContent.match(/^\s*/);
+        return match ? match[0].length : 0;
+    }
+    return 0;
+}
+
+
