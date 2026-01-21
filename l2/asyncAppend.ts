@@ -40,4 +40,3 @@ export declare const asyncAppend: (value: AsyncIterable<unknown>, _mapper?: ((v:
  * directive's return type.
  */
 export type { AsyncAppendDirective };
-//# sourceMappingURL=async-append.d.ts.map

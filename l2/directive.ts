@@ -65,4 +65,4 @@ export declare abstract class Directive implements Disconnectable {
     abstract render(...props: Array<unknown>): unknown;
     update(_part: Part, props: Array<unknown>): unknown;
 }
-//# sourceMappingURL=directive.d.ts.map
+
