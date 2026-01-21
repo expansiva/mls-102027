@@ -6,7 +6,9 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 import { ChildPart } from '/_102027_/l2/litHtml.js';
-import { AsyncDirective, DirectiveParameters } from '/_102027_/l2/asyncDirective.js';
+import { AsyncDirective } from '/_102027_/l2/asyncDirective.js';
+import { DirectiveParameters } from '/_102027_/l2/directive.js';
+
 type Mapper<T> = (v: T, index?: number) => unknown;
 export declare class AsyncReplaceDirective extends AsyncDirective {
     private __value?;
