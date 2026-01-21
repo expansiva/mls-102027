@@ -12,8 +12,9 @@
  */
 import { CSSResultGroup, CSSResultOrNative } from '/_102027_/l2/cssTag.js';
 import type { ReactiveController, ReactiveControllerHost } from '/_102027_/l2/reactiveController.js';
-// export * from '/_102027_/l2/cssTag.js';
-// export type { ReactiveController, ReactiveControllerHost, } from '/_102027_/l2/reactiveController.js';
+export * from '/_102027_/l2/cssTag.js';
+export type { ReactiveController, ReactiveControllerHost, } from '/_102027_/l2/reactiveController.js';
+
 /**
  * Contains types that are part of the unstable debug API.
  *
