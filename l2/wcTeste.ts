@@ -1,4 +1,4 @@
-/// <mls shortName="wcTeste" project="102027" enhancement="_102027_enhancementLit" />
+/// <mls fileReference="_102027_/l2/wcTeste.ts" enhancement="_102027_enhancementLit" />
 
  import { html, LitElement } from 'lit'; 
 import { customElement, property } from 'lit/decorators.js';
