@@ -1,4 +1,4 @@
-/// <mls shortName="collabImport" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/collabImport.ts" enhancement="_blank" />
 
 interface CollabImportOptions {
     project: number;
