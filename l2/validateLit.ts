@@ -1,4 +1,4 @@
-/// <mls shortName="validateLit" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/validateLit.ts" enhancement="_blank" />
 
 import type { IDecoratorDictionary, IDecoratorDetails, IDecoratorClassInfo } from '/_102027_/l2/propiertiesLit.js';
 import { convertFileNameToTag, setErrorOnModel } from '/_102027_/l2/utils.js';
