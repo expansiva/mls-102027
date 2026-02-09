@@ -1,4 +1,4 @@
-/// <mls shortName="templateContent" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/templateContent.ts" enhancement="_blank" />
 
 /**
  * @license
