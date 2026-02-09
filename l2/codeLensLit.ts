@@ -1,4 +1,4 @@
-/// <mls shortName="codeLensLit" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/codeLensLit.ts" enhancement="_blank" />
 
 import type { IDecoratorDictionary, IDecoratorDetails } from '/_102027_/l2/propiertiesLit.js';
 

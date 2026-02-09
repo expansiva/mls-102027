@@ -1,4 +1,4 @@
-/// <mls shortName="designSystemBase" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/designSystemBase.ts" enhancement="_blank" />
 
 import { collabImport } from '/_102027_/l2/collabImport.js';
 

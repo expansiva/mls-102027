@@ -1,4 +1,4 @@
-/// <mls shortName="customElement" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/customElement.ts" enhancement="_blank" />
 
 /**
  * @license

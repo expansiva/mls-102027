@@ -1,4 +1,4 @@
-/// <mls shortName="collabLitElement" project="102027" enhancement="_100554_enhancementLit" />
+/// <mls fileReference="_102027_/l2/collabLitElement.ts" enhancement="_100554_enhancementLit" />
 
 
 import { LitElement } from 'lit';
