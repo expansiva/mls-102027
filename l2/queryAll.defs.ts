@@ -1,2 +1,2 @@
-/// <mls shortName="queryAll" project="102027" enhancement="_blank" folder="" />
+/// <mls fileReference="_102027_/l2/queryAll.defs.ts" enhancement="_blank" />
 
