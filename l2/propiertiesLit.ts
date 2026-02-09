@@ -1,4 +1,4 @@
-/// <mls shortName="propiertiesLit" project="102027" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/propiertiesLit.ts" enhancement="_blank" />
 
 export function getPropierties(model: mls.editor.IModelTS): mls.l2.enhancement.IProperties[] {
     let rc: mls.l2.enhancement.IProperties[] = [];
