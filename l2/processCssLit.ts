@@ -1,9 +1,21 @@
 /// <mls fileReference="_102027_/l2/processCssLit.ts" enhancement="_blank" />
 
-import { compileStyleUsingMFile } from '/_102027_/l2/libCompileStyle.js';
+import { compileStyleUsingMFile, compileStyleUsingSourceString } from '/_102027_/l2/libCompileStyle.js';
 
 export async function injectStyle(modelTS: mls.editor.IModelTS, theme: string, enhancementName: string): Promise<void> {
     injectStyleWithoutShadowRoot(modelTS, theme, enhancementName);
+}
+
+export async function injectStyleAction(sourceJS: string, sourceTS: string, sourceLess: string, sourceTokens: string, theme: string, enhancementName: string): Promise<string> {
+    return _injectStyleAction(sourceJS, sourceTS, sourceLess, sourceTokens, theme, enhancementName);
+}
+
+async function _injectStyleAction(sourceJS: string, sourceTS: string, sourceLess: string, sourceTokens: string, theme: string, enhancementName: string) {
+    const css = await compileStyleUsingSourceString(sourceLess, sourceTokens, theme);
+    if (!css) return sourceJS;
+    const newJs = addLineInConstructor(sourceJS, `if(this.loadStyle) this.loadStyle(\`${css}\`);`, enhancementName);
+    if (!newJs || newJs.indexOf('/// <mls') < 0) return sourceJS;
+    return newJs;
 }
 
 export async function injectStyleWithoutShadowRoot(modelTS: mls.editor.IModelTS, theme: string, enhancementName: string): Promise<void> {
@@ -14,10 +26,9 @@ export async function injectStyleWithoutShadowRoot(modelTS: mls.editor.IModelTS,
 
     const css = await compileStyleUsingMFile(modelStyle, theme);
     if (!css) return;
-    if (modelTS && modelTS.compilerResults) {
 
+    if (modelTS && modelTS.compilerResults) {
         const newJs = addLineInConstructor(modelTS.compilerResults.prodJS, `if(this.loadStyle) this.loadStyle(\`${css}\`);`, enhancementName);
-        //if (!newJs || !newJs.trim().startsWith('/// <mls')) return;
         if (!newJs || newJs.indexOf('/// <mls') < 0) return;
         modelTS.compilerResults.prodJS = newJs;
         mls.stor.cache.clearObsoleteCache();
