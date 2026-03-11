@@ -1,5 +1,11 @@
 /// <mls fileReference="_102027_/l2/utils.ts" enhancement="_blank" />
 
+export function getPath(widget: string): mls.stor.IFileInfoBase | undefined {
+
+    return mls.actual[0].setFullName(widget).getStorFileBase();
+    
+}
+
 export function convertTagToFileName(tag: string): {
     shortName: string;
     project: number;
