@@ -75,10 +75,10 @@ export const onAfterChange = async (modelTS: mls.editor.IModelTS): Promise<void>
 
 
 export const onAfterCompile = async (modelTS: mls.editor.IModelTS): Promise<void> => {
-    await injectStyle(modelTS, 'Default', '_102027_enhancementLit');
+    await injectStyle(modelTS, 'Default', '_102027_/l2/enhancementLit');
     return;
 }
 
 export const onAfterCompileAction = async (sourceJS: string, sourceTS: string, css?: { sourceLess: string, sourceTokens: string }): Promise<string> => {
-    return await injectStyleAction(sourceJS, sourceTS, css?.sourceLess || '', css?.sourceTokens || '', 'Default', '_102027_enhancementLit');
+    return await injectStyleAction(sourceJS, sourceTS, css?.sourceLess || '', css?.sourceTokens || '', 'Default', '_102027_/l2/enhancementLit');
 }
