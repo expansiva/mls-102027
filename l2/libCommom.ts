@@ -1,6 +1,5 @@
 /// <mls fileReference="_102027_/l2/libCommom.ts" enhancement="_blank"/>
 
-import { getMessageKey } from "/_102027_/l2/collabLitElement.js";
 import { getPath } from '/_102027_/l2/utils.js';
 
 /// **collab_i18n_start** 
@@ -712,6 +711,18 @@ export async function getProjectModuleConfig(path: string, project: number): Pro
     const moduleConfig = await (await import('/_102027_/l2/collabImport.js')).collabImport({ folder: path, project, shortName: 'module', extension: '.ts' });
     if (!moduleConfig) return undefined;
     return moduleConfig.moduleConfig;
+}
+
+export function getMessageKey(messages: any): string {
+  const keys = Object.keys(messages);
+  if (!keys || keys.length < 1) throw new Error('Error Message not valid for international');
+  const firstKey = keys[0];
+  const lang = (document.documentElement.lang || '').toLowerCase();
+  if (!lang) return firstKey;
+  if (messages.hasOwnProperty(lang)) return lang;
+  const similarLang = keys.find((key: string) => lang.substring(0, 2) === key);
+  if (similarLang) return similarLang;
+  return firstKey;
 }
 
 
