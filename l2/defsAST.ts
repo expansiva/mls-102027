@@ -76,7 +76,7 @@ export function getSkill(source: string): string {
   return match[1];
 }
 
-export function updateSkill(source: string, value: string): string {
+export function replaceSkill(source: string, value: string): string {
   const decl = 'export const skill =';
   if (!/export\s+const\s+skill\s*=/.test(source)) {
     return source.trimEnd() + '\n\n' + decl + ' `' + value + '`\n';
