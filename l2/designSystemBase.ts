@@ -10,18 +10,25 @@ export async function getTokens(project: number): Promise<IDesignSystemTokens[]>
 }
 
 export async function getTokensLess(project: number, theme: string): Promise<string> {
-    const tokens = await getTokens(project)
-    const tokenByTheme = tokens.find((item) => item.themeName === theme);
-    if (!tokenByTheme) throw new Error(`no find theme: ${theme}`);
-    let tokensLess = '';
-    tokensLess += Object.keys(tokenByTheme.color).map((key) => {
-        let token = '';
-        if (!key.startsWith('_dark-')) token = `@${key}: ${tokenByTheme.color[key]};`
-        return token;
-    }).filter((item) => !!item).join('\n')
-    tokensLess += '\n' + Object.keys(tokenByTheme.typography).map((key) => `@${key}: ${tokenByTheme.typography[key]};`).join('\n');
-    tokensLess += '\n' + Object.keys(tokenByTheme.global).map((key) => `@${key}: ${tokenByTheme.global[key]};`).join('\n');
-    return Promise.resolve(tokensLess);
+    try {
+        const tokens = await getTokens(project)
+        const tokenByTheme = tokens.find((item) => item.themeName === theme);
+        if (!tokenByTheme) throw new Error(`no find theme: ${theme}`);
+        let tokensLess = '';
+        tokensLess += Object.keys(tokenByTheme.color).map((key) => {
+            let token = '';
+            if (!key.startsWith('_dark-')) token = `@${key}: ${tokenByTheme.color[key]};`
+            return token;
+        }).filter((item) => !!item).join('\n')
+        tokensLess += '\n' + Object.keys(tokenByTheme.typography).map((key) => `@${key}: ${tokenByTheme.typography[key]};`).join('\n');
+        tokensLess += '\n' + Object.keys(tokenByTheme.global).map((key) => `@${key}: ${tokenByTheme.global[key]};`).join('\n');
+        return Promise.resolve(tokensLess);
+    } catch (err: any) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn('[getTokensLess] No design system file:', message);
+        return ''
+    }
+
 }
 
 export async function getTokensLessByTokensArray(tokens: IDesignSystemTokens[], theme: string): Promise<string> {
@@ -41,22 +48,39 @@ export async function getTokensLessByTokensArray(tokens: IDesignSystemTokens[], 
 
 
 export async function getTokensCss(project: number, theme: string): Promise<string> {
+    let tokens: IDesignSystemTokens[] = [];
 
-    const tokens = await getTokens(project);
-    const prefix = ':root';
     try {
-        const tokenInfo = tokens.find((item) => item.themeName === theme);
+        tokens = await getTokens(project);
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn('[getTokensCss] Project has no design system:', message);
+        return '';
+    }
+
+    try {
+        const prefix = ':root';
+
+        const tokenInfo = tokens.find(item => item.themeName === theme);
         if (!tokenInfo) return '';
-        const allTokens = { ...tokenInfo.color, ...tokenInfo.typography, ...tokenInfo.global };
-        const darkAndLight = getDarkAndLight(allTokens);
-        const cssVars = getCssVars(darkAndLight, prefix);
-        const tokensCss = convertLessTokensToCss(cssVars, darkAndLight['root']);
+
+        const allTokens = {
+            ...tokenInfo.color,
+            ...tokenInfo.typography,
+            ...tokenInfo.global
+        };
+
+        const themedTokens = getDarkAndLight(allTokens);
+        const cssVars = getCssVars(themedTokens, prefix);
+        const tokensCss = convertLessTokensToCss(cssVars, themedTokens.root);
+
         return tokensCss;
-    } catch (err: any) {
-        throw new Error(`Error on compile tokens Less: ${err.message}`);
+
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`[getTokensCss] Error compiling tokens: ${message}`);
     }
 }
-
 
 export async function getGlobalCss(project: number, theme: string): Promise<string> {
     let less = await getGlobalLess(project);
@@ -90,9 +114,18 @@ export async function compileLess(str: string): Promise<string> {
 }
 
 export async function preCompileLess(project: number, less: string, theme: string): Promise<string> {
+    let tokens: IDesignSystemTokens[] = [];
+    let tokensLess: string = '';
 
-    const tokens = await getTokens(project);
-    const prefix = ':root';
+    try {
+        tokens = await getTokens(project);
+        tokensLess = await getTokensLess(project, theme);
+
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn('[preCompileLess] Project has no design system:', message);
+        return '';
+    }
 
     try {
         less = removeTokensFromSource(less);
@@ -101,7 +134,6 @@ export async function preCompileLess(project: number, less: string, theme: strin
         const allTokens = { ...tokenInfo.color, ...tokenInfo.typography, ...tokenInfo.global };
         const darkAndLight = getDarkAndLight(allTokens);
         const newLess = convertLessTokensToCss(less, darkAndLight['root']);
-        const tokensLess = await getTokensLess(project, theme);
         const res = await compileLess(`${newLess}\n${tokensLess}`)
         return res;
     } catch (err: any) {
