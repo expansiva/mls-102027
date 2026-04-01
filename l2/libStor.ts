@@ -248,6 +248,7 @@ export async function undoFile(storFile: mls.stor.IFileInfo, removeProject: bool
     if (storFile.status === 'changed') {
         storFile.status = 'nochange';
         storFile.inLocalStorage = false;
+        storFile.hasError = false;
         await mls.stor.localStor.setContent(storFile, { contentType: 'string', content: null });
         if (storFile.isLocalVersionOutdated && storFile.newVersionRefIfOutdated) {
             storFile.versionRef = storFile.newVersionRefIfOutdated;

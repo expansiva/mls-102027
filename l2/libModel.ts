@@ -3,7 +3,7 @@
 import { getEnhancementName, getBaseTemplate } from '/_102027_/l2/libCommom.js';  
 import { getTokensLess, removeTokensFromSource } from '/_102027_/l2/designSystemBase.js';
 import { getPath} from '/_102027_/l2/utils.js';
-import { getDefsByFile } from '/_102027_/l2/libMindMap.js'; 
+import { getDefsByFile } from '/_102027_/l2/libMindMap.js';
 
 export async function readProjectTypescriptAndCompile(project: number, shortName: string, needCompile: boolean = true) {
 
@@ -496,7 +496,10 @@ async function _updateModelStatusLess(modelBase: mls.editor.IModelStyle, changed
         if (fileModels.ts.compilerResults) {
             fileModels.ts.compilerResults.modelNeedCompile = true;
         }
-        await mls.l2.typescript.compileAndPostProcess(fileModels.ts, true, true);
+    
+        const isOk = await mls.l2.typescript.compileAndPostProcess(fileModels.ts, true, true);
+
+        fileModels.ts.storFile.hasError = !isOk;
     }
 
 
