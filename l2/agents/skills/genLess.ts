@@ -1,19 +1,19 @@
 /// <mls fileReference="_102027_/l2/agents/skills/genLess.ts" enhancement="_blank"/>
 
 export const skill = `
-    # SKILL: Component LESS File
+# SKILL: Component LESS File
 
-You are responsible for creating the component's LESS file. By analyzing the component's YAML, you generate a semantic, encapsulated LESS file based on system tokens — never inventing tokens, never placing styles outside the root tag.
+You are responsible for creating the component's LESS file.
+From the JSON definition you generate a semantic, encapsulated LESS file
+using only the system tokens provided in this skill.
+
+You never invent tokens. You never place styles outside the root tag.
+You never use tag selectors or element selectors — only the class names
+declared in the JSON classes array.
 
 ---
 
-## The YAML you will receive
-
-Use the following fields from the YAML to generate the LESS:
-
-- \`tag\` → root tag name for encapsulation and for the \`fileReference\`
-- \`file\` → base path of the component (replace \`.ts\` with \`.less\` for the \`fileReference\`)
-- \`render\` → layout structure, elements, classes and states to style
+- tagName     → root encapsulation tag and the component selector
 
 ---
 
@@ -41,7 +41,7 @@ example
 
 ### 2. Encapsulation within the component tag
 
-All CSS must be inside the component tag defined in \`tag\` in the YAML. Nothing outside it.
+All CSS must be inside the component tag defined in \`tagName\` in the JSON. Nothing outside it.
 
 \`\`\`less
 petshop-update-product {
@@ -81,20 +81,61 @@ color: #e53935;
 
 ---
 
-### 4. Analyze the render from the YAML to generate styles
 
-For each block in \`render\`, generate the corresponding styles:
+## 4. Generating styles from the classes array
 
-**\`loading_state\`** → style for the loading container and spinner
+For each entry in classes, generate one LESS block using the
+name as the class selector. Use role and context to decide
+what CSS properties to apply.
 
-**\`error_state\`** → style for the error message (color, spacing)
+Role → CSS pattern mapping:
 
-**\`default_layout\`** → main form styles:
-- Form layout (display, gap, padding)
-- Two-column grid style (\`two-column\`)
-- Each field type: \`input\`, \`textarea\`, \`select\`, \`checkbox\`
-- \`actions\` block with button alignment
-- Button variants: \`primary\` and \`secondary\`
+state-container
+  display: flex; align-items: center; justify-content: center;
+  Use context to decide padding and any specific color.
+
+loading-indicator
+  Animated spinner — use border + border-radius + @keyframes animation.
+  Never use a background image or external asset.
+
+text
+  font-size, font-family, color derived from context
+  (loading message → muted; error message → danger color).
+
+form-root
+  display: flex; flex-direction: column; gap from tokens or direct value.
+
+columns-container
+  display: grid; grid-template-columns based on layout.columns value;
+  gap from tokens or direct value.
+
+column
+  display: flex; flex-direction: column; gap from tokens or direct value.
+
+full-width-row
+  width: 100%; applies below the columns grid.
+
+actions-row
+  display: flex; justify-content: flex-end; gap from tokens or direct value.
+  Context says "aligned to the right" → justify-content: flex-end.
+
+field-wrapper
+  display: flex; flex-direction: column; gap: 4px.
+  label text styles: font-size, font-family.
+
+text-input / select-input
+  width: 100%; padding; border; border-radius; font-size; font-family; box-sizing: border-box.
+
+checkbox-input
+  width: auto; cursor: pointer.
+
+button-base
+  Shared button styles: padding, border-radius, cursor, font-size, font-family, border: none.
+  Also include &:disabled { opacity: 0.6; cursor: not-allowed; }.
+
+button-variant
+  Only the variant-specific overrides (background-color, color, border).
+  Context "primary" → filled background. Context "secondary" → transparent + border.
 
 ---
 
@@ -202,14 +243,12 @@ petshop-update-product {
 
 ---
 
-## Validation checklist
+## What you NEVER do
 
-- [ ] Triple slash present as the first line with \`enhancement="_blank"\`
-- [ ] \`fileReference\` points to the correct \`.less\` derived from the \`file\` field in the YAML
-- [ ] All CSS encapsulated within the component tag
-- [ ] Root tag matches exactly the \`tag\` field in the YAML
-- [ ] No styles declared outside the root tag
-- [ ] Tokens used only when they exist in the provided list
-- [ ] Values without a corresponding token used directly
-- [ ] No tokens invented
+- Place any style outside the component tag
+- Use element selectors (input, form, button, label) — only class selectors
+- Invent tokens not in the provided list
+- Generate styles for classes not listed in the JSON classes array
+- Add resets or global styles
+- Duplicate class declarations
 `
