@@ -1,7 +1,7 @@
 /// <mls fileReference="_102027_/l2/agents/materialize/agentMaterialize.ts" enhancement="_102027_/l2/enhancementAgent.ts"/>
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
-import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js'; 
+import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js';
 
 export function createAgent(): IAgentAsync {  
   return {
@@ -21,7 +21,6 @@ async function beforePromptImplicit(
   context: mls.msg.ExecutionContext,
   userPrompt: string,
 ): Promise<mls.msg.AgentIntent[]> {
-
 
   const paths: string[] = [];
 
@@ -57,8 +56,7 @@ async function beforePromptStep(
 ): Promise<mls.msg.AgentIntent[]> {
   if (!args) throw new Error(`[beforePromptStep] args invalid`)
 
-
-  if (args.startsWith("@@")) {
+  if (args.startsWith("@@")) { // se fosse paralelo
   
     const continueParallel1: mls.msg.AgentIntentPromptReady = {
       type: "prompt_ready",
@@ -67,7 +65,7 @@ async function beforePromptStep(
       threadId: context.message.threadId,
       taskId: context.task?.PK || '',
       hookSequential,
-      parentStepId: parentStep.stepId,
+      parentStepId: 1,
       humanPrompt: '',
       systemPrompt: system1
     }
@@ -76,7 +74,6 @@ async function beforePromptStep(
   }
 
   //
-
   const orch = getMaterializeOrchestrator(args);
   const itens = await orch.process('init');
 
@@ -88,7 +85,8 @@ async function beforePromptStep(
     taskId: context.task?.PK || '',
     hookSequential,
     parentStepId: parentStep.stepId,
-    humanPrompt: JSON.stringify({ path: args, itens })
+    humanPrompt: JSON.stringify({ path: args, itens }),
+    systemPrompt: system1 // tem q remover se for paralelo
   }
 
   return [continueParallel];
@@ -107,10 +105,33 @@ async function afterPromptStep(
   const payload = (step.interaction?.payload?.[0]);
   if (payload?.type !== 'flexible' || !payload.result) throw new Error(`[afterPromptStep] invalid payload: ${payload}`)
   let status: mls.msg.AIStepStatus = 'completed';
+  let intents: mls.msg.AgentIntent[] = [];
 
+  const output = payload.result;
+  intents = await processOutput(context, output, agent);
 
-  const orch = getMaterializeOrchestrator(payload.result.path);
-  const group = orch.groupByAgent(payload.result.itens)
+  const updateStatus: mls.msg.AgentIntentUpdateStatus = {
+    type: 'update-status',
+    hookSequential,
+    messageId: context.message.orderAt,
+    threadId: context.message.threadId,
+    taskId: context.task?.PK || '',
+    parentStepId: parentStep.stepId,
+    stepId: step.stepId,
+    status
+  };
+
+  return [...intents, updateStatus];
+
+}
+
+async function processOutput(context: mls.msg.ExecutionContext, output: any, agent: IAgentMeta): Promise<mls.msg.AgentIntent[]> {
+
+  let module = context.task?.iaCompressed?.longMemory['moduleName'];
+  if (!module) throw new Error('Not found moduleName:' + agent.agentName);
+
+  const orch = getMaterializeOrchestrator(output.path);
+  const group = orch.groupByAgent(output.itens)
 
   const newSteps: mls.msg.AgentIntentAddStep[] = [];
 
@@ -135,28 +156,14 @@ async function afterPromptStep(
         prompt: '@@ ' + JSON.stringify(info),
         rags: [],
       },
-      executionMode: { type: 'parallel', args: info.map((i: any) => JSON.stringify({ path: payload.result.path, item:i })) }
+      executionMode: { type: 'parallel', args: info.map((i: any) => JSON.stringify({ path: output.path, item:i })) }
     };
 
     newSteps.push(newStep)
 
   });
-
-
-
-  const updateStatus: mls.msg.AgentIntentUpdateStatus = {
-    type: 'update-status',
-    hookSequential,
-    messageId: context.message.orderAt,
-    threadId: context.message.threadId,
-    taskId: context.task?.PK || '',
-    parentStepId: parentStep.stepId,
-    stepId: step.stepId,
-    status
-  };
-
-  return [...newSteps, updateStatus];
-
+  
+  return newSteps;
 }
 
 const system1 = `

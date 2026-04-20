@@ -1,9 +1,9 @@
-/// <mls fileReference="_102027_/l2/agents/materialize/agentMaterializeSharedPage.ts" enhancement="_100554_/l2/enhancementAgent.ts"/>
+/// <mls fileReference="_102027_/l2/agents/materialize/agentMaterializeSharedPage.ts" enhancement="_102027_/l2/enhancementAgent.ts"/>
 
-import { IAgentAsync, IAgentMeta } from '/_100554_/l2/aiAgentBase.js';
-import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js';  
- 
-export function createAgent(): IAgentAsync { 
+import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
+import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js';
+
+export function createAgent(): IAgentAsync {
   return {
     agentName: "agentMaterializeSharedPage",
     agentProject: 102027,
@@ -22,8 +22,8 @@ async function beforePromptImplicit(
   userPrompt: string,
 ): Promise<mls.msg.AgentIntent[]> {
 
- 
-  const paths: string[] = []; 
+
+  const paths: string[] = [];
 
   const inputs: mls.msg.IAMessageInputType[] = [{ type: "system", content: system1 }];
 
@@ -58,7 +58,7 @@ async function beforePromptStep(
   if (!args) throw new Error(`[beforePromptStep] args invalid`)
 
   if (args.startsWith("@@")) {
-  
+
     const continueParallel1: mls.msg.AgentIntentPromptReady = {
       type: "prompt_ready",
       args,
@@ -75,7 +75,7 @@ async function beforePromptStep(
   }
 
   console.info('--------agentMaterializeSharedPage--------')
-  const info = JSON.parse(args) as { path: string, item: mls.defs.MaterializeEntry, project?:number };
+  const info = JSON.parse(args) as { path: string, item: mls.defs.MaterializeEntry, project?: number };
   info.project = mls.actualProject || 0;
   const orch = getMaterializeOrchestrator(info.path);
   const user = await orch.getVar(info.path, info.item.specVar);
@@ -92,7 +92,7 @@ async function beforePromptStep(
     parentStepId: parentStep.stepId,
     humanPrompt: prompt
   }
-  
+
   return [continueParallel];
 
 }
@@ -109,13 +109,32 @@ async function afterPromptStep(
   if (payload?.type !== 'flexible' || !payload.result) throw new Error(`[afterPromptStep] invalid payload: ${payload}`)
 
   let status: mls.msg.AIStepStatus = 'completed';
+  let intents: mls.msg.AgentIntent[] = [];
 
-  console.info(payload.result);
-  
-  const orch = getMaterializeOrchestrator(payload.result.path);
-  await orch.createStorFile(payload.result.outputPath, payload.result.srcFile);
+  const output = payload.result;
+  intents = await processOutput(context, output, agent);
 
-  const group = await orch.processGroup(payload.result.id);
+  const updateStatus: mls.msg.AgentIntentUpdateStatus = {
+    type: 'update-status',
+    hookSequential,
+    messageId: context.message.orderAt,
+    threadId: context.message.threadId,
+    taskId: context.task?.PK || '',
+    parentStepId: parentStep.stepId,
+    stepId: step.stepId,
+    status
+  };
+
+  return [...intents, updateStatus];
+
+}
+
+async function processOutput(context: mls.msg.ExecutionContext, output: any, agent: IAgentMeta): Promise<mls.msg.AgentIntent[]> {
+
+  const orch = getMaterializeOrchestrator(output.path);
+  await orch.createStorFile(output.outputPath, output.srcFile);
+
+  const group = await orch.processGroup(output.id);
   const newSteps: mls.msg.AgentIntentAddStep[] = [];
 
   Object.keys(group).forEach((g) => {
@@ -139,26 +158,14 @@ async function afterPromptStep(
         prompt: '@@ ' + JSON.stringify(info),
         rags: [],
       },
-      executionMode: { type: 'parallel', args: info.map((i: any) => JSON.stringify({ path: payload.result.path, item:i })) }
+      executionMode: { type: 'parallel', args: info.map((i: any) => JSON.stringify({ path: output.path, item: i })) }
     };
 
     newSteps.push(newStep)
 
   });
 
-  const updateStatus: mls.msg.AgentIntentUpdateStatus = {
-    type: 'update-status',
-    hookSequential,
-    messageId: context.message.orderAt,
-    threadId: context.message.threadId,
-    taskId: context.task?.PK || '',
-    parentStepId: parentStep.stepId,
-    stepId: step.stepId,
-    status
-  };
-
-  return [...newSteps, updateStatus];
-
+  return newSteps;
 }
 
 const system1 = `
