@@ -177,7 +177,7 @@ You must return the result following the skill's steps. The return value should 
 
 ## Output format
 You must return the object strictly as JSON
-[[OutputSection]]
+[[OutputSection]] 
 
 `
 

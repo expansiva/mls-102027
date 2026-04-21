@@ -9,7 +9,7 @@ export function createAgent(): IAgentAsync {
     agentName: "agentMaterializeLess",
     agentProject: 102027,
     agentFolder: "agents/materialize",
-    agentDescription: "new agent",
+    agentDescription: "new agent", 
     visibility: "public",
     beforePromptImplicit,
     beforePromptStep,
