@@ -11,6 +11,7 @@ export function getMaterializeOrchestrator(defPath: string): MaterializeOrchestr
     if (!cacheMaterializeOrchestrator.has(defPath)) {
         const orchestrator = new MaterializeOrchestrator(defPath);
         orchestrator.onAllCompleted = () => {
+            console.info('kill path:' + defPath);
             cacheMaterializeOrchestrator.delete(defPath);
         };
         cacheMaterializeOrchestrator.set(defPath, orchestrator);
@@ -116,8 +117,8 @@ export class MaterializeOrchestrator {
         }
     }
 
-    public async processTemplate(input: string): Promise<string> {
-        const regex = /\[\[\((.*?)\)\.(.*?)\]\]/g;
+    private async processTemplate(input: string): Promise<string> {
+        const regex = /\[\[\((.*?)\)(?:\.(.*?))?\]\]/g;
 
         let result = input;
 
@@ -128,34 +129,58 @@ export class MaterializeOrchestrator {
             const filePath = match[1];
             const expression = match[2];
 
-            const isFunction = expression.endsWith("()");
-            const exportName = isFunction
-                ? expression.replace("()", "")
-                : expression;
+            if (!expression) {
 
-            try {
                 const f = mls.stor.convertFileReferenceToFile(filePath);
                 if (!f) continue;
-                const module = await collabImport(f as any);
 
-                if (!module) {
-                    console.info(`Módulo não registrado: ${filePath}`);
-                    continue;
+                const key = mls.stor.getKeyToFile(f);
+                const sf = mls.stor.files[key];
+
+                if (!sf) continue;
+                let replacement = await sf.getContent() as string;
+                result = result.replace(fullMatch, JSON.stringify(replacement));
+
+
+            } else {
+
+                const isFunction = expression.endsWith("()");
+                const exportName = isFunction
+                    ? expression.replace("()", "")
+                    : expression;
+
+                try {
+                    const f = mls.stor.convertFileReferenceToFile(filePath);
+                    if (!f) continue;
+                    const module = await collabImport(f as any);
+
+                    if (!module) {
+                        console.info(`Módulo não registrado: ${filePath}`);
+                        continue;
+                    }
+
+                    let replacement;
+
+                    if (isFunction) {
+                        replacement = await module[exportName]();
+                    } else {
+                        replacement = module[exportName];
+                    }
+
+                    if (typeof replacement === "object") {
+                        result = result.replace(fullMatch, JSON.stringify(replacement));
+                    } else {
+                        result = result.replace(fullMatch, String(replacement));
+                    }
+
+
+
+                } catch (err) {
+                    console.error(`Erro em ${fullMatch}`, err);
                 }
 
-                let replacement;
-
-                if (isFunction) {
-                    replacement = await module[exportName]();
-                } else {
-                    replacement = module[exportName];
-                }
-
-                result = result.replace(fullMatch, String(replacement));
-
-            } catch (err) {
-                console.error(`Erro em ${fullMatch}`, err);
             }
+
         }
 
         return result;
@@ -193,7 +218,7 @@ export class MaterializeOrchestrator {
         }, {} as GroupedByAgent);
     }
 
-    public async getVar(path:string, variable: string): Promise<string> {
+    public async getVar(path: string, variable: string): Promise<string> {
 
         try {
             const f = mls.stor.convertFileReferenceToFile(path);
@@ -209,7 +234,7 @@ export class MaterializeOrchestrator {
                 console.info(`Variable não registrado: ${path}; ${variable}`);
                 return '';
             }
-        
+
 
             let result = module[variable];
 
@@ -217,7 +242,7 @@ export class MaterializeOrchestrator {
                 return JSON.stringify(result);
             }
 
-            return await this.processTemplate(result); 
+            return await this.processTemplate(result);
 
         } catch (err) {
             console.error(`Erro em ${path}`, err);
@@ -226,10 +251,10 @@ export class MaterializeOrchestrator {
 
     }
 
-    public async createStorFile(fileRef: string, src: string): Promise<mls.stor.IFileInfo>{
+    public async createStorFile(fileRef: string, src: string): Promise<mls.stor.IFileInfo> {
 
         if (!fileRef.startsWith('_')) fileRef = `_${mls.actualProject || 0}_${fileRef}`;
-        
+
         const info = mls.stor.convertFileReferenceToFile(fileRef);
 
         const k = mls.stor.getKeyToFile(info);
@@ -239,8 +264,8 @@ export class MaterializeOrchestrator {
         if (!sf) {
             const param: IReqCreateStorFile = {
                 ...info,
-                source:src
-            } 
+                source: src
+            }
 
             sf = await createStorFile(param, false, false, false);
 
@@ -250,7 +275,7 @@ export class MaterializeOrchestrator {
 
                 const m = await createModelAnyFile(sf);
                 if (m && m.model) m.model.setValue(src);
-                
+
             } else {
 
                 const m = await sf.getOrCreateModel();
@@ -259,7 +284,7 @@ export class MaterializeOrchestrator {
         }
 
         return sf;
-        
+
     }
 
 }

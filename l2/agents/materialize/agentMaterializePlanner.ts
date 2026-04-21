@@ -3,7 +3,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';  
 import { appendLongTermMemory } from '/_100554_/l2/aiAgentHelper.js';
 
-export function createAgent(): IAgentAsync { 
+export function createAgent(): IAgentAsync {  
     return {
         agentName: "agentMaterializePlanner",
         agentProject: 102027,
@@ -81,6 +81,7 @@ async function afterPromptStep(
 
         await appendLongTermMemory(context, { "moduleName": "pizzaria" });
         const ag = extractObjectFromString(payload.result.prompt) || '[]';
+
         const newStep: mls.msg.AgentIntentAddStep = {
             type: "add-step",
             messageId: context.message.orderAt,
@@ -96,7 +97,7 @@ async function afterPromptStep(
                 nextSteps: [],
                 agentName: 'agentMaterialize',
                 //prompt: '@@' + payload.result.prompt,
-                prompt: JSON.parse(ag)[0].toString(),
+                prompt: JSON.parse(ag)[0],
                 rags: payload.result.rags,
             },
             //executionMode: {type:'parallel', args:JSON.parse(ag)}

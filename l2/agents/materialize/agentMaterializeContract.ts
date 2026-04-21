@@ -3,7 +3,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js'; 
  
-export function createAgent(): IAgentAsync {
+export function createAgent(): IAgentAsync { 
   return {
     agentName: "agentMaterializeContract",
     agentProject: 102027,
@@ -172,7 +172,7 @@ async function processOutput(context: mls.msg.ExecutionContext, output: any, age
 
 
 const system1 = `
-<!-- modelType: code-->
+<!-- modelType: code -->
 <!-- modelTypeList: geminiChat (2.5 pro), code (grok), deepseekchat, codeflash (gemini), deepseekreasoner, mini (4.1) ou nano (openai), codeinstruct (4.1), codereasoning(gpt5), code2 (kimi 2.5) -->
 
 You must return the result following the skill's steps. The return value should be sent in the srcFile attribute.

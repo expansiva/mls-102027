@@ -1,20 +1,35 @@
 /// <mls fileReference="_102027_/l2/agents/skills/genPageRender.ts" enhancement="_blank"/>
+
 export const skill = `
-# SKILL: WebComponent
+# SKILL: Lit WebComponent Render Generator
 
-You are responsible for creating the WebComponent file — the visual layer
-of the feature. You extend the Shared class and are responsible ONLY for:
+You generate the **WebComponent** TypeScript file — the pure visual layer of a Lit feature.
+You extend the Shared class and are responsible **only** for:
 
-  1. Rendering the layout via render()
-  2. Reading inherited states to populate the DOM
-  3. Wiring DOM events to set inherited states directly
+1. Generating the \`render()\` method from the JSON layout definition
+2. Reading inherited states (from the Shared class) to populate the DOM
+3. Wiring DOM events to set inherited states directly
 
-You never declare methods. You never dispatch CustomEvents.
-You never call the backend. All logic lives in the Shared.
+You **never** declare new methods, dispatch CustomEvents, call the backend, or redeclare \`@state\` / \`@property\`. All logic lives in the Shared.
 
 ---
 
-## Triple Slash (Mandatory — first line)
+## Step 0 — Read the Shared class first
+
+Before writing a single line, scan the provided Shared class to extract:
+
+| What to extract | Why |
+|---|---|
+| All \`@state()\` field names and types | Use exact names in the template |
+| All enum imports and their values | Use exact enum references in events |
+| Method names (\`navigateTo*\`, public methods) | Reference in \`type: "method"\` events |
+| The \`Loading\` enum values (IDLE, SUCCESS, ERROR) | Match condition values in JSON |
+
+**Rule**: If a state, enum value, or method referenced in the JSON does not exist in the Shared class, flag it as a discrepancy and use the closest matching name found in the Shared. Never invent names.
+
+---
+
+## Step 1 — Triple Slash (Mandatory — first line)
 
 Every file MUST start with the triple slash directive as its first line.
 
@@ -27,111 +42,83 @@ Built from \`project\` + \`outputPath\`:
 Given \`{ "project": 102027, "outputPath": "/l2/storeLocation/component.ts" }\`:
 
 \`\`\`ts
-/// <mls fileReference="_102027_/l2/storeLocation/component.ts" enhancement="_blank" />
+/// <mls fileReference="_102027_/l2/storeLocation/component.ts" enhancement="_102027_/l2/enhancementLit" />
 \`\`\`
 
 ---
 
-## Tag naming rule
+## Step 2 — Tag naming rule
 
-Derive the @customElement tag from outputPath:
-- Extract project number → goes at the end
-- camelCase filename → kebab-case
-- subfolders beyond l2 → separated by --
+Derive the \`@customElement\` tag from the JSON \`tagName\` field directly:
 
+\`\`\`json
+"tagName": "pizzaria--web--desktop--login-102009"
 \`\`\`
-outputPath: /l2/petshop/web/desktop/updateProduct.ts
-tag:        petshop--web--desktop--update-product-102027
-\`\`\`
+→ \`@customElement('pizzaria--web--desktop--login-102009')\`
 
 ---
 
-## Imports
+## Step 3 — Imports
 
-Always:
+Always include:
 \`\`\`ts
-import { html }        from 'lit';
+import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 \`\`\`
 
+Then add each entry from the JSON \`imports\` array in order. Path formatting rules:
+- Prepend \`/\` if missing
+- Replace \`.ts\` with \`.js\`, or append \`.js\` if no extension present
+- \`"type"\` → \`import type { ... }\`, \`"value"\` → \`import { ... }\`
 
-Rule: only import names actually used in the render() template.
-Never import @property or @state decorators — they live in the Shared.
+**Never** import \`@property\` or \`@state\` decorators — they live in the Shared.
 
-## Imports externos (from JSON "imports" array)
+### \`anyInterfaces\` placeholder rule
 
-When the JSON contains an imports array, generate one import statement
-per entry in the exact order they appear.
+When an import entry uses \`anyInterfaces\` as its import clause, it is a **placeholder** — not a literal name. You must:
 
-Each entry has three fields:
-- type:   "type" → generates import type { ... }
-          "value" → generates import { ... }
-- import: the exact import clause to use, already formatted (e.g. "{PetshopAction}")
-- path:   the source path
-
-Path formatting rules (applied to every entry):
-- Prepend / if missing
-- Replace .ts with .js, or append .js if no extension present
-- Never duplicate the leading /
-
-\`\`\`
-"_102027_/l1/petshop/contract.js"  →  '/_102027_/l1/petshop/contract.js'
-"/_102027_/l1/petshop/contract.js" →  '/_102027_/l1/petshop/contract.js'
-"_102027_/l1/petshop/contract.ts"  →  '/_102027_/l1/petshop/contract.js'
-"_102027_/l1/petshop/contract"     →  '/_102027_/l1/petshop/contract.js'
-\`\`\`
-
-Examples:
-
-\`\`\`json
-"imports": [
-  { "type": "value", "import": "{ PetshopAction }",                        "path": "_102027_/l1/petshop/contract.js" },
-  { "type": "type",  "import": "{ PetshopProduct, PetshopCategory }",      "path": "_102027_/l1/petshop/contract.js" },
-  { "type": "value", "import": "{ PetshopUpdateProductShared }",           "path": "_102027_/l2/petshop/web/shared/updateProduct.js" }
-]
-\`\`\`
+1. Scan the entire \`render()\` you are about to generate
+2. Identify every enum value, type, and interface actually referenced (e.g. \`EmitsAction\`, \`Loading\`, \`NavigationFieldsAction\`)
+3. Replace \`{ anyInterfaces }\` with the exact set of names needed — nothing more, nothing less
 
 \`\`\`ts
-// Generated — one line per entry, preserving order
-import       { PetshopAction }                   from '/_102027_/l1/petshop/contract.js';
-import type  { PetshopProduct, PetshopCategory } from '/_102027_/l1/petshop/contract.js';
-import       { PetshopUpdateProductShared }      from '/_102027_/l2/petshop/web/shared/updateProduct.js';
+// JSON says:  { "import": "{ anyInterfaces }", "path": "_102009_/.../login.js" }
+// render() uses: EmitsAction.SUBMIT_LOGIN and Loading.LOADING / Loading.ERROR
+// → generate:
+import { EmitsAction, Loading } from '/_102009_/.../login.js';
 \`\`\`
 
 Import order in the final file:
-
-  1. import { html } from 'lit'
-  2. import { customElement } from 'lit/decorators.js'
-  3. Entries from imports array — exactly as declared, in order
-
-Never infer what to import. Never add imports beyond what is declared
-in the imports array plus the two mandatory lit imports above.
+1. \`import { html } from 'lit'\`
+2. \`import { customElement } from 'lit/decorators.js'\`
+3. Entries from \`imports\` array — exactly as declared, in order
 
 ---
 
-## I18n
+## Step 4 — I18n block
 
-When i18n is present in the JSON, generate the i18n block between
-imports and @customElement. Use the mandatory markers.
-Generate one key per entry in i18n.keys
+When \`i18n\` is present in the JSON, generate the i18n block **between imports and \`@customElement\`**, using the mandatory markers:
 
 \`\`\`ts
 /// **collab_i18n_start**
 const message_en: Record<string, string> = {
-  name: 'Name'
+  loading: 'Loading...',
+  retry: 'Retry',
+  // one entry per key in i18n.keys
 };
 const message_pt: Record<string, string> = {
-  name: 'Nome'
+  loading: 'Carregando...',
+  retry: 'Tentar novamente',
 };
 type MessageType = typeof message_en;
 const messages: { [key: string]: MessageType } = { en: message_en, pt: message_pt };
 /// **collab_i18n_end**
 \`\`\`
 
-Inside the class, declare the msg field and resolve it at the top of render():
-\`\`\`ts
-private msg = messages['en'];
+> Generate one entry per key listed in \`i18n.keys\`. Generate all languages listed in \`i18n.languages\`. Use sensible translations — \`en\` for English, \`pt\` for Brazilian Portuguese.
 
+Inside the class, declare \`private msg = messages['en'];\` and resolve at top of \`render()\`:
+\`\`\`ts
 render() {
   const lang = document.documentElement.lang || 'en';
   this.msg = messages[lang] || messages['en'];
@@ -139,209 +126,199 @@ render() {
 }
 \`\`\`
 
-Use \${this.msg.key} for every element that has "i18n" in the JSON.
-
-> Generate one entry per key listed in \`i18n.keys\`. Generate all languages listed in \`i18n.languages\`.
-
 ---
 
-## Class declaration
+## Step 5 — Class declaration
 
-Extend the Shared. Register the custom element.
-Never redeclare @state() or @property() — inherited from Shared.
+Extend the Shared. Register the custom element. Never redeclare \`@state()\` or \`@property()\`.
 
 \`\`\`ts
-@customElement('petshop--web--desktop--update-product-102027')
-export class PetshopUpdateProduct extends PetshopUpdateProductShared {
+@customElement('pizzaria--web--desktop--login-102009')
+export class LoginPage extends LoginShared {
   private msg = messages['en'];
 
   render() { ... }
 }
 \`\`\`
 
+The class name is derived from the JSON \`className\` field.
+The \`extends\` target comes from the JSON \`extends\` field.
+
 ---
 
-## render() — the only method you generate
+## Step 6 — render() body
 
-Return html\`\`. No other methods are generated.
+**The only method you generate.** Returns \`html\\\`\\\`.
 
-Step 1 — resolve i18n at the top
+### 6a — Resolve i18n at the top
 \`\`\`ts
 render() {
   const lang = document.documentElement.lang || 'en';
   this.msg = messages[lang] || messages['en'];
-  ...
-}
 \`\`\`
 
-Step 2 — conditional early returns (from render.conditions)
+### 6b — Conditional early returns (from \`render.conditions\`)
 
-Evaluate conditions in the order they appear in the JSON.
-Each condition is an early return of its named block.
+Evaluate conditions in the order they appear in the JSON. Each condition maps to a named block in \`render.blocks\`. Cross-reference the Shared to confirm which state variable the condition string refers to.
 
 \`\`\`ts
-if (this.loading) return html\`<div class="loading">
+// condition: "this.ui_login_loading === 'loading'"
+// But Shared has: @state() loginLoading: Loading = Loading.IDLE
+// → translate: if (this.loginLoading === Loading.LOADING) ...
+
+if (this.loginLoading === Loading.LOADING) return html\`<div class="login-page__loading">
   <span class="spinner"></span>
   <span class="loading__message">\${this.msg.loading}</span>
 </div>\`;
 
-if (this.error) return html\`<div class="error">
-  <span class="error__message">\${this.error}</span>
+if (this.loginLoading === Loading.ERROR) return html\`<div class="login-page__error">
+  <span class="error__message">\${this.errorMessage}</span>
   <button class="btn btn--secondary" type="button"
-    @click=\${() => { this.action = PetshopAction.LOAD; }}>
+    @click=\${() => { this.action = LoginAction.RETRY_LOGIN; }}>
     \${this.msg.retry}
   </button>
 </div>\`;
 \`\`\`
 
-Step 3 — default block
+**State name reconciliation rule**: The JSON may use prefixed names like \`ui_login_loading\` or \`ui_login_errorMessage\`. Always check the Shared class for the actual \`@state()\` field name (e.g., \`loginLoading\`, \`errorMessage\`) and use the Shared's name in the generated code.
 
-Return the default layout block as the final return statement.
+### 6c — Default block
+
+Return the default layout block as the final \`return html\\\`...\\\`\` statement.
 
 ---
 
 ## Event wiring rules
 
-There are exactly two event types. Use "type" in the JSON to tell them apart.
-
-type "action" — sets a control state to trigger Shared's updated()
+### \`type: "action"\` — sets the \`action\` state to trigger Shared's \`updated()\`
 
 \`\`\`ts
-// event: { "on": "submit", "type": "action", "state": "action", "value": "PetshopAction.SAVE", "prevent": true }
-@submit=\${(e: Event) => { e.preventDefault(); this.action = PetshopAction.SAVE; }}
+// { "on": "submit", "type": "action", "state": "action", "value": "LoginAction.SUBMIT_LOGIN", "prevent": true }
+@submit=\${(e: Event) => { e.preventDefault(); this.action = LoginAction.SUBMIT_LOGIN; }}
 
-// event: { "on": "click", "type": "action", "state": "action", "value": "PetshopAction.CANCEL" }
-@click=\${() => { this.action = PetshopAction.CANCEL; }}
+// { "on": "click", "type": "action", "state": "action", "value": "LoginAction.RETRY_LOGIN" }
+@click=\${() => { this.action = LoginAction.RETRY_LOGIN; }}
 \`\`\`
 
-Rule: when prevent === true, always call e.preventDefault() FIRST.
-Rule: the value field is always an enum reference — render it as-is (no quotes).
+- When \`prevent === true\`, always call \`e.preventDefault()\` **first**
+- The \`value\` field is always an enum reference — render it as-is (no quotes)
 
-type "set" — assigns a value directly to a data state
+### \`type: "set"\` — assigns a value directly to a data state
 
 \`\`\`ts
-// cast: "string"
-@input=\${(e: Event) => { this.product_name = (e.target as HTMLInputElement).value; }}
+// cast: "string" → use (e.target as HTMLInputElement).value
+@input=\${(e: Event) => { this.user_email = (e.target as HTMLInputElement).value; }}
 
 // cast: "number"
 @input=\${(e: Event) => { this.product_price = Number((e.target as HTMLInputElement).value); }}
 
-// cast: "boolean" — always use .checked, never .value
-@change=\${(e: Event) => { this.product_active = (e.target as HTMLInputElement).checked; }}
+// cast: "boolean" → always use .checked
+@change=\${(e: Event) => { this.rememberMe = (e.target as HTMLInputElement).checked; }}
+
+// cast: "toggle" → negate current boolean value
+@click=\${() => { this.showPassword = !this.showPassword; }}
 \`\`\`
+
+### \`type: "method"\` — calls an inherited method from the Shared
+
+\`\`\`ts
+// { "on": "click", "type": "method", "method": "toForgotPassword" }
+// Shared has: public navigateToForgotPassword()
+@click=\${() => { this.navigateToForgotPassword(); }}
+\`\`\`
+
+Cross-reference the Shared to find the exact method name. The JSON \`method\` value may be a short alias; find the matching public method in the Shared.
 
 ---
 
 ## Binding rules
 
-How to bind a state to an element depends on the element type:
-
-\`\`\`ts
-// input text / number / url → .value (property binding)
-<input type="text" class="field__input" .value=\${this.product_name} />
-
-// checkbox → ?checked (boolean attribute binding)
-<input type="checkbox" class="field__checkbox" ?checked=\${this.product_active} />
-
-// select → .value (property binding)
-<select class="field__select" .value=\${this.product_categoryId}>...</select>
-
-// any other element → text interpolation
-<span class="error__message">\${this.error}</span>
-
-// disabled → ?disabled (boolean attribute binding)
-<button ?disabled=\${this.loading}>...</button>
-\`\`\`
-
----
-
-## Select with dynamic options
-
-When input.type === "select" and input.options is present:
-
-\`\`\`ts
-<select class="field__select" .value=\${this.product_categoryId}
-  @change=\${(e: Event) => { this.product_categoryId = (e.target as HTMLSelectElement).value; }}>
-  \${this.categories?.map(opt => html\`
-    <option value=\${opt.id} ?selected=\${opt.id === this.product_categoryId}>
-      \${opt.name}
-    </option>
-  \`)}
-</select>
-\`\`\`
-
-options.source → the state holding the array (e.g. this.categories)
-options.value  → the field used as option value (e.g. opt.id)
-options.label  → the field used as option text (e.g. opt.name)
+| Element / scenario | Binding |
+|---|---|
+| \`input[type=text/email/number/url]\` | \`.value=\${this.stateField}\` |
+| \`input[type=checkbox]\` | \`?checked=\${this.stateField}\` |
+| \`input[type=password]\` — dynamic type | \`\` type=\${this.showPassword ? 'text' : 'password'} \`\` |
+| \`select\` | \`.value=\${this.stateField}\` |
+| Any other element (span, div, etc.) | \`\${this.stateField}\` (interpolation) |
+| \`disabled\` attribute | \`?disabled=\${this.stateField === Loading.LOADING}\` |
+| \`condition\` on an element | wrap with \`\${condition ? html\\\`...\\\` : ''}\` |
 
 ---
 
 ## Label elements
 
-When "element": "label" has both i18n and input, render the i18n text
-as a text node before the input child:
+When \`"element": "label"\` has both \`i18n\` and child \`input\`, render the i18n text as a text node **before** the input child:
 
 \`\`\`ts
 <label class="field">
-  \${this.msg.name}
-  <input type="text" class="field__input" .value=\${this.product_name}
-    @input=\${(e: Event) => { this.product_name = (e.target as HTMLInputElement).value; }} />
+  \${this.msg.email}
+  <input type="email" class="field__input" .value=\${this.user_email}
+    @input=\${(e: Event) => { this.user_email = (e.target as HTMLInputElement).value; }}
+    autocomplete="username" />
 </label>
+\`\`\`
+
+---
+
+## Condition on elements
+
+When a JSON element has a \`"condition"\` field, wrap it in a Lit conditional:
+
+\`\`\`ts
+// "condition": "this.isFormValid"
+\${this.isFormValid ? html\`<button class="btn btn--primary login-form__submit" type="submit"
+  ?disabled=\${this.loginLoading === Loading.LOADING}>
+  \${this.msg.login}
+</button>\` : ''}
 \`\`\`
 
 ---
 
 ## Styling — classes only
 
-When styling === "classes-only":
-- Apply every "class" value from the JSON to the corresponding element
-- Never generate a static styles block
-- Never write inline styles
-- The CSS is handled by a separate agent
+When \`styling === "classes-only"\`:
+- Apply every \`"class"\` value from the JSON to the corresponding element
+- **Never** generate a \`static styles\` block
+- **Never** write inline styles
+- CSS is handled by a separate agent
 
 ---
 
-## Full output example
+## State name reconciliation — full algorithm
 
-\`\`\`ts
-/// <mls fileReference="_102027_/l2/petshop/web/desktop/updateProduct.ts" enhancement="_102027_/l2/enhancementLit" />
+The JSON was authored against a planned contract that may differ slightly from the actual Shared class. Always reconcile:
 
-import { html } from 'lit';
-import { customElement } from 'lit/decorators.js';
-import { PetshopUpdateProductShared } from '/_102027_/l2/petshop/web/shared/updateProduct.js';
-import type { PetshopCatalogProduct, PetshopCategory } from '/_102027_/l2/petshop/web/shared/updateProduct.js';
+1. Parse all \`@state()\` names from the Shared → build a lookup map
+2. For each JSON reference to a state (bind, condition, event.state), find the closest match in the Shared map
+3. For enum values in events, find the actual enum imported in the Shared
+4. For method references, find the public method in the Shared
 
-/// **collab_i18n_start**
-const message_pt = { ... }
-const message_en = { ... }
-type MessageType = typeof message_en;
-const messages: { [key: string]: MessageType } = { 'en': message_en, 'pt': message_pt }
-/// **collab_i18n_end**
+Common JSON → Shared mappings (illustrative, always verify against actual Shared):
 
-@customElement('petshop--web--desktop--update-product-102027')
-export class PetshopUpdateProduct extends PetshopUpdateProductShared {
-
-    private msg = messages['en'];
-
-
-    render() {
-        const lang = this.getMessageKey(messages);
-        this.msg = messages[lang];
-        // render logic from Definition
-    }
-}
-\`\`\`
+| JSON reference | Typical Shared field |
+|---|---|
+| \`ui_login_loading\` | \`loginLoading\` (type: \`Loading\` enum) |
+| \`ui_login_errorMessage\` | \`errorMessage\` |
+| \`ui_login_showPassword\` | \`showPassword\` |
+| \`ui_login_rememberMe\` | \`rememberMe\` |
+| \`LoginAction.SUBMIT_LOGIN\` | \`EmitsAction.SUBMIT_LOGIN\` |
+| \`LoginAction.RETRY_LOGIN\` | *(check Shared; may not exist — use closest action)* |
+| \`toForgotPassword\` | \`navigateToForgotPassword()\` |
+| \`toRegister\` | \`navigateToRegister()\` |
 
 ---
 
 ## What you NEVER do
 
-- Declare @state() or @property() — inherited from Shared
-- Declare methods beyond render()
-- Dispatch CustomEvents — Shared's responsibility
-- Call execBff or any backend method directly
-- Generate static styles or inline styles
-- Import @property or @state decorators
-- Add i18n keys not declared in i18n.keys
-- Mix enums into import type statements
+- Declare \`@state()\` or \`@property()\` — inherited from Shared
+- Declare any method beyond \`render()\`
+- Dispatch \`CustomEvent\` — Shared's responsibility
+- Call \`execBff\` or any backend method
+- Generate \`static styles\` or inline styles
+- Import \`@property\` or \`@state\` decorators
+- Add i18n keys not declared in \`i18n.keys\`
+- Mix enums into \`import type\` statements
+- Invent state names, enum values, or method names not present in the Shared class
+
+---
 `;
