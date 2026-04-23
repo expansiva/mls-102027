@@ -6,7 +6,7 @@ import { appendLongTermMemory } from '/_100554_/l2/aiAgentHelper.js';
 export function createAgent(): IAgentAsync {  
     return {
         agentName: "agentMaterializePlanner",
-        agentProject: 102027,
+        agentProject: 102027, 
         agentFolder: "",
         agentDescription: "First agent for general materialize",
         visibility: "public",

@@ -1,7 +1,7 @@
 /// <mls fileReference="_102027_/l2/agents/materialize/agentMaterializeContract.ts" enhancement="_102027_/l2/enhancementAgent.ts"/>
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
-import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js'; 
+import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js';  
  
 export function createAgent(): IAgentAsync { 
   return {
@@ -81,7 +81,6 @@ async function beforePromptStep(
   const user = await orch.getVar(info.path, info.item.specVar);
   const skill = await orch.getSkill(info.item.skillPath);
   const prompt = `##Skill\n${skill}\n\n##User data\n${user}\n\n##User info\n${JSON.stringify(info)}`;
-
   const continueParallel: mls.msg.AgentIntentPromptReady = {
     type: "prompt_ready",
     args,
@@ -149,6 +148,7 @@ async function processOutput(context: mls.msg.ExecutionContext, output: any, age
       threadId: context.message.threadId,
       taskId: context.task?.PK || '',
       parentStepId: 1,
+      stepTitle: g+" file {{completed}} of {{total}}, errors: {{failed}}",
       step:
       {
         type: 'agent',
