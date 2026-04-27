@@ -524,13 +524,15 @@ async function _updateModelStatusLess(modelBase: mls.editor.IModelStyle, changed
     let fileModels = mls.editor.getModels(project, shortName, folder, level);
     if (!fileModels) throw new Error('[_updateModelStatusLess] Not found file models');
 
+
     const enhacementName = await getStyleEnhancementName({ project, shortName, folder, level }).catch((e: any) => undefined);
+    if (enhacementName === '_blank') return;
     if (!enhacementName || enhacementName === 'enhancementStyle') {
         const enhancementInstanceLess = await import('/_100554_/l2/enhancementStyle.js')
         if (enhancementInstanceLess) await enhancementInstanceLess.onAfterChange(fileModels);
     } else {
         const path = getPath(enhacementName);
-        if (!path) throw new Error('[_updateModelStatusLess] Not found path:' + enhacementName)
+        if (!path || !path.shortName || !path.project) throw new Error('[_updateModelStatusLess] Not found path:' + enhacementName)
         const enhancementInstanceLess = await import(`/_${path.project}_/l2/${path.folder ? path.folder + '/' : ''}${path.shortName}.js`)
         if (enhancementInstanceLess) await enhancementInstanceLess.onAfterChange(fileModels);
     }
