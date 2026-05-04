@@ -478,7 +478,8 @@ export async function prepareClarificationElement(
     if (!task) throw new Error(`[${agentName}](startClarification) Invalid context.task`);
     let clarificationValue: ClarificationValue | Object = {};
 
-    await import('/_100554_/l2/widgetQuestionsForClarification.js');
+    let url = '/_100554_/l2/widgetQuestionsForClarification.js';
+    await import(url);
     try {
         let ret: any = clarification;
         if (typeof clarification === "string") ret = JSON.parse(clarification || '') as any;
