@@ -169,7 +169,7 @@ export class CollabSpliterVerticalVarFixed extends LitElement {
                         for (let entry of entries) {
                             this.fixedheight = entry.contentRect.height.toString();
                         }
-                    }, 500);
+                    }, 500) as unknown as number;
 
                 });
 
