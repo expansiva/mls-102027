@@ -526,16 +526,18 @@ async function _updateModelStatusLess(modelBase: mls.editor.IModelStyle, changed
 
 
     const enhacementName = await getStyleEnhancementName({ project, shortName, folder, level }).catch((e: any) => undefined);
-    if (enhacementName === '_blank') return;
+
+
     if (!enhacementName || enhacementName === 'enhancementStyle') {
-        let url ='/_100554_/l2/enhancementStyle.js';
+        let url = '/_100554_/l2/enhancementStyle.js';
         const enhancementInstanceLess = await import(url);
         if (enhancementInstanceLess) await enhancementInstanceLess.onAfterChange(fileModels);
     } else {
         const path = getPath(enhacementName);
-        if (!path || !path.shortName || !path.project) throw new Error('[_updateModelStatusLess] Not found path:' + enhacementName)
-        const enhancementInstanceLess = await import(`/_${path.project}_/l2/${path.folder ? path.folder + '/' : ''}${path.shortName}.js`)
-        if (enhancementInstanceLess) await enhancementInstanceLess.onAfterChange(fileModels);
+        if (path && path.shortName && path.project) {
+            const enhancementInstanceLess = await import(`/_${path.project}_/l2/${path.folder ? path.folder + '/' : ''}${path.shortName}.js`)
+            if (enhancementInstanceLess) await enhancementInstanceLess.onAfterChange(fileModels);
+        }
     }
 
 
