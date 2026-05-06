@@ -1,5 +1,5 @@
 /// <mls fileReference="_102027_/l2/agents/skills/genPageRender.ts" enhancement="_blank"/>
-
+ 
 export const skill = `
 # SKILL: Lit WebComponent Render Generator
 
@@ -34,7 +34,7 @@ Before writing a single line, scan the provided Shared class to extract:
 Every file MUST start with the triple slash directive as its first line.
 
 \`\`\`ts
-/// <mls fileReference="_XXXXX_/l1/path/contract.ts" enhancement="_102027_/l2/enhancementLit" />
+/// <mls fileReference="_XXXXX_/l1/path/contract.ts" enhancement="_102020_/l2/enhancementAura" />
 \`\`\`
 
 Built from \`project\` + \`outputPath\`:
@@ -42,7 +42,7 @@ Built from \`project\` + \`outputPath\`:
 Given \`{ "project": 102027, "outputPath": "/l2/storeLocation/component.ts" }\`:
 
 \`\`\`ts
-/// <mls fileReference="_102027_/l2/storeLocation/component.ts" enhancement="_102027_/l2/enhancementLit" />
+/// <mls fileReference="_102027_/l2/storeLocation/component.ts" enhancement="_102020_/l2/enhancementAura" />
 \`\`\`
 
 ---
@@ -274,13 +274,39 @@ When a JSON element has a \`"condition"\` field, wrap it in a Lit conditional:
 
 ---
 
-## Styling — classes only
+## Styling — Tailwind (always active)
 
-When \`styling === "classes-only"\`:
-- Apply every \`"class"\` value from the JSON to the corresponding element
-- **Never** generate a \`static styles\` block
-- **Never** write inline styles
-- CSS is handled by a separate agent
+Tailwind utility classes are **always** used. Never generate a \`static styles\` block or inline styles.
+
+- If the JSON provides a \`"class"\` field for an element, use it as the base and complement it with additional Tailwind classes as needed to produce a coherent, visually consistent result
+- If the JSON provides **no** \`"class"\` field, infer and apply appropriate Tailwind classes based on:
+  - The element's **semantic role** (container, form, input, button, label, heading, error message, spinner, etc.)
+  - The element's **position** in the layout hierarchy (wrapper vs. inner element)
+  - The element's **state** (loading, error, disabled)
+  - The overall **visual context** suggested by the component name and JSON structure
+
+### Tailwind class guidelines by element type
+
+| Element / role | Suggested Tailwind baseline |
+|---|---|
+| Page / root wrapper | \`flex flex-col min-h-screen\` |
+| Form container | \`flex flex-col gap-4 w-full max-w-md mx-auto p-6\` |
+| Card / panel | \`bg-white rounded-2xl shadow-md p-6\` |
+| Section heading | \`text-2xl font-bold text-gray-800\` |
+| Sub-heading / label | \`text-sm font-medium text-gray-700 mb-1\` |
+| Text input | \`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500\` |
+| Primary button | \`w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed\` |
+| Secondary / ghost button | \`w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50\` |
+| Link-style button | \`text-sm text-blue-600 hover:underline\` |
+| Error message | \`text-sm text-red-600 mt-1\` |
+| Loading spinner wrapper | \`flex flex-col items-center justify-center gap-3 py-12\` |
+| Spinner element | \`h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent\` |
+| Checkbox wrapper | \`flex items-center gap-2\` |
+| Checkbox input | \`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500\` |
+| Divider | \`my-4 border-t border-gray-200\` |
+| Helper / hint text | \`text-xs text-gray-500 mt-1\` |
+
+> These are starting points. Always adjust based on the actual element context and surrounding layout. The goal is a coherent, accessible UI — not a mechanical mapping.
 
 ---
 

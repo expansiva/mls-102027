@@ -89,14 +89,14 @@ public navigateToForgotPassword() {
 Every file MUST start with the triple slash directive as its first line.
 
 \`\`\`ts
-/// <mls fileReference="_XXXXX_/l2/path/file.ts" enhancement="_102027_/l2/enhancementLit" />
+/// <mls fileReference="_XXXXX_/l2/path/file.ts" enhancement="_102020_/l2/enhancementAura" />
 \`\`\`
 
 Built from project + outputPath:
 Given { "project": 102027, "outputPath": "/l2/petshop/product/shared.ts" }:
 
 \`\`\`ts
-/// <mls fileReference="_102027_/l2/petshop/product/shared.ts" enhancement="_102027_/l2/enhancementLit" />
+/// <mls fileReference="_102027_/l2/petshop/product/shared.ts" enhancement="_102020_/l2/enhancementAura" />
 \`\`\`
 
 ---
