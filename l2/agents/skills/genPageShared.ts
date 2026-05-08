@@ -17,6 +17,19 @@ You generate a **Shared** TypeScript file: a headless Lit 3 base class that hold
 
 ---
 
+## CRITICAL — Never invent states or types
+
+You **must not** create any \`@state()\`, \`@property()\`, type, or interface that is not explicitly derived from one of the two inputs above.
+
+- Every **data state** must map to an \`entityField\` declared in \`dataShape.entityFields\` of the pages JSON
+- Every **computed state** must map to a \`computedField\` declared in the pages JSON
+- Every **temp state** must appear in \`pages[*].tempStates\` or \`organism[*].tempStates\`
+- Every **action state** (e.g. \`Loading\`) must appear in \`pages[*].actionStates\` with its enum imported from the contract
+- Every **type** used in \`@state()\` or \`@property()\` must be a primitive (\`string\`, \`number\`, \`boolean\`) or an enum/interface that already exists in the contract
+- If a field, enum, or interface is not in the inputs, **do not declare it** — flag the gap as a discrepancy instead
+
+---
+
 ## CRITICAL — \`action\` state type
 
 Scan the contract for every exported enum whose name ends in \`Action\` (e.g. \`TempStateAction\`, \`NavigationFieldsAction\`, \`EmitsAction\`). The \`action\` state is a **union of all of them**:
@@ -113,6 +126,8 @@ Read \`pages[*].purpose\` and each \`organism[*].purpose\`.
 Only values that come from outside: \`dataShape.params\` with \`source.from === "route"\` or \`"input"\`.
 
 ### Step 3 — Identify \`@state()\` fields
+
+> **Rule**: Every state listed below must be traceable to the pages JSON or the contract. If a field is not in either input, do not declare it.
 
 **Control states** — always present:
 \`\`\`ts
@@ -228,9 +243,10 @@ private _computeIsFormValid() {
 ## Imports
 
 \`\`\`ts
-import { CollabLitElement } from '/_102027_/l2/collabLitElement.js';
+import {CollabLitElement } from '/_102029_/l2/collabLitElement.js';
 import { property, state }  from 'lit/decorators.js';
 import { execBff }          from '/_102029_/l2/bffClient.js';
+import { bindExpectedNavigationLoad, consumeExpectedNavigationLoad } from '/_102029_/l2/interactionRuntime.js';
 \`\`\`
 
 From the contract (\`import type\` for interfaces, regular \`import\` for enums and mocks):
@@ -246,6 +262,19 @@ import {
 \`\`\`
 
 Derive \`{interfacePath}\` from the contract's \`fileReference\`, replacing \`.ts\` with \`.js\`.
+
+---
+## interactionRuntime
+
+Allways implement this in \`connectedCallback()\` when something dispatches on mount (e.g. navigation with \`dispatchOnMount\) to ensure the page waits for the expected navigation load before rendering.
+
+\`\`\`ts
+connectedCallback() {
+  super.connectedCallback();
+  const pendingLoad = consumeExpectedNavigationLoad();
+  bindExpectedNavigationLoad(pendingLoad, Promise.resolve());
+}
+\`\`\`
 
 ---
 
@@ -336,6 +365,8 @@ Array result: \`const res: user[] = Mock_user;\` (no \`[0]\`), assign directly t
 - Put \`this.action = null\` anywhere other than the first line of each handler method
 - Generate \`updated()\` when there are no actions
 - Generate \`connectedCallback()\` when nothing dispatches on mount
+- **Invent \`@state()\` fields not present in the pages JSON** — every data, computed, temp, and action state must be traceable to the input
+- **Invent types, interfaces, or enums** not already declared in the contract — if something is missing, flag it as a discrepancy and do not fabricate it
 
 ---
 `
