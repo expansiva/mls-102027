@@ -1,19 +1,20 @@
 /// <mls fileReference="_102027_/l2/collabSelectKnob.less" enhancement="enhancementStyle"/>
 
+/// <mls fileReference="_102027_/l2/collabSelectKnob.less" enhancement="enhancementStyle"/>
+
 collab-select-knob-102027 {
 
     @font-face {
         font-family: 'Digital-7';
-        // src: url('https://s3.us-east-1.amazonaws.com/www.collab.codes/www/20260318093449/en/l3/_100529_/fonts/digital-7.ttf') format('truetype');
         src: url('l3/_100529_/fonts/digital-7.ttf') format('truetype');
     }
 
     // ─────────────────────────────────────────────
-    // Variables
+    // Variables (base sizes at scale 1)
     // ─────────────────────────────────────────────
-    @knob-size: 114px; // diâmetro do anel externo prateado
-    @knob-fosso-size: 84px; // diâmetro do sub-anel preto (fosso)
-    @knob-inner-size: 68px; // diâmetro do corpo central (botão)
+    @knob-size: 114px;
+    @knob-fosso-size: 84px;
+    @knob-inner-size: 68px;
     @knob-color-active: #4db8ff;
     @knob-color-glow: rgba(77, 184, 255, 0.7);
     @knob-color-text: #d3ffff;
@@ -21,6 +22,12 @@ collab-select-knob-102027 {
         'Courier New',
         monospace;
     @transition-speed: 0.12s;
+
+    // ─────────────────────────────────────────────
+    // Responsive: use CSS custom property --knob-scale
+    // Parent can set: style="--knob-scale: 0.7"
+    // Defaults to 1 if not set
+    // ─────────────────────────────────────────────
 
     // ─────────────────────────────────────────────
     // Root
@@ -33,12 +40,18 @@ collab-select-knob-102027 {
         gap: 8px;
         width: @knob-size + 32px;
         outline: none;
-        cursor: grab;
+        cursor: pointer;
         user-select: none;
         -webkit-user-select: none;
+        // Responsive: zoom shrinks both visual and layout box
+        zoom: var(--knob-scale, 1);
 
-        &:active {
-            cursor: grabbing;
+        &.is-active {
+            cursor: grab;
+
+            &:active {
+                cursor: grabbing;
+            }
         }
 
         &.is-disabled {
@@ -57,6 +70,18 @@ collab-select-knob-102027 {
         height: @knob-size + 32px;
         border-radius: 50%;
         flex-shrink: 0;
+    }
+
+    // No ticks mode: collapse the ring to just fit the body
+    .widgets--select-one-knob-102020.no-ticks {
+        .knob__ticks-ring {
+            width: @knob-size;
+            height: @knob-size;
+        }
+
+        .knob__tick {
+            display: none;
+        }
     }
 
     .knob__tick {
@@ -81,13 +106,9 @@ collab-select-knob-102027 {
 
     // ─────────────────────────────────────────────
     // Knob body
-    // As 3 camadas são construídas com box-shadow:
-    //   Camada 1 → corpo escuro metálico (o próprio elemento)
-    //   Camada 2 → fosso preto            (box-shadow imediato)
-    //   Camada 3 → anel prata             (box-shadow externo, espessura controlada)
     // ─────────────────────────────────────────────
-    @fosso-width: ((@knob-fosso-size - @knob-inner-size) / 2.5); // ~8px
-    @ring-width: ((@knob-size - @knob-fosso-size) / 3); // ~15px
+    @fosso-width: ((@knob-fosso-size - @knob-inner-size) / 2.5);
+    @ring-width: ((@knob-size - @knob-fosso-size) / 3);
 
     .knob__body {
         position: absolute;
@@ -99,7 +120,6 @@ collab-select-knob-102027 {
         margin-left: -(@knob-inner-size / 2);
         border-radius: 50%;
 
-        // ── Camada 1: corpo do botão, escuro metálico com highlight no topo-esquerdo
         background: radial-gradient(circle at 40% 30%,
                 #3a404d 0%,
                 #3a404d 30%,
@@ -121,8 +141,6 @@ collab-select-knob-102027 {
         transition: transform @transition-speed ease, box-shadow @transition-speed ease;
         will-change: transform;
     }
-
-
 
     .knob__indicator {
         position: absolute;
@@ -159,7 +177,6 @@ collab-select-knob-102027 {
         border-bottom-left-radius: 13px;
         border-bottom-right-radius: 13px;
         overflow: hidden;
-
     }
 
     .knob__value {
@@ -195,11 +212,9 @@ collab-select-knob-102027 {
                 0 0 10px 3px #75eeff,
                 0 0 18px 4px #4badff;
         }
-
     }
 
     @keyframes knob-blink {
-
         0%,
         100% {
             opacity: 1;
@@ -231,4 +246,5 @@ collab-select-knob-102027 {
     }
 
 }
+
 

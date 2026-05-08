@@ -1,6 +1,5 @@
 /// <mls fileReference="_102027_/l2/collabSelectKnob.ts" enhancement="_102027_/l2/enhancementLit.ts"/>
 
-
 import { html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { StateLitElement } from '/_102027_/l2/stateLitElement.js';
@@ -14,23 +13,20 @@ export class SelectOneKnobWidget extends StateLitElement {
   @property({ type: Number }) step = 1;
   @property({ type: Boolean, reflect: true }) disabled = false;
   @property({ type: Boolean, reflect: true }) selected = false;
+  @property({ type: Boolean, attribute: 'show-ticks' }) showTicks = true;
 
   @state() private _focused = false;
 
-  // --- drag state ---
   private _dragStartY = 0;
   private _dragStartValue = 0;
   private _dragging = false;
 
-  // --- digit input state ---
   private _pendingDigit = '';
   private _digitTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // exibe o dígito sendo digitado antes do timeout confirmar
   @state() private _pendingDisplay: string | null = null;
   @state() private _pendingInvalid = false;
 
-  // --- computed ---
   private get _hasValue(): boolean {
     return this.value !== null && this.value !== undefined;
   }
@@ -39,7 +35,6 @@ export class SelectOneKnobWidget extends StateLitElement {
     if (!this._hasValue) return -135;
     const range = this.max - this.min;
     const normalized = ((this.value! - this.min) / range);
-    // arco de -135deg até +135deg (270deg total)
     return -135 + normalized * 270;
   }
 
@@ -47,7 +42,6 @@ export class SelectOneKnobWidget extends StateLitElement {
     return Math.floor((this.max - this.min) / this.step) + 1;
   }
 
-  // valor exibido no LCD: mostra dígito pendente durante digitação
   private get _displayValue(): string {
     if (this._pendingDisplay !== null) return this._pendingDisplay;
     if (this._hasValue) return String(this.value);
@@ -58,7 +52,10 @@ export class SelectOneKnobWidget extends StateLitElement {
     return !this._hasValue && this._pendingDisplay === null;
   }
 
-  // --- value helpers ---
+  private get _canInteract(): boolean {
+    return !this.disabled && this.selected;
+  }
+
   private _clamp(v: number): number {
     return Math.min(this.max, Math.max(this.min, v));
   }
@@ -75,9 +72,17 @@ export class SelectOneKnobWidget extends StateLitElement {
     }
   }
 
-  // --- keyboard ---
+  private _cycleValue() {
+    if (!this._hasValue) {
+      this._setValue(this.min);
+      return;
+    }
+    const next = this.value! + this.step;
+    this._setValue(next > this.max ? this.min : next);
+  }
+
   private _onKeyDown(e: KeyboardEvent) {
-    if (this.disabled) return;
+    if (!this._canInteract) return;
 
     if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
       e.preventDefault();
@@ -103,23 +108,19 @@ export class SelectOneKnobWidget extends StateLitElement {
       return;
     }
 
-    // digit input
     if (/^[0-9]$/.test(e.key)) {
       e.preventDefault();
       this._pendingDigit += e.key;
 
-      // atualiza display imediatamente com o dígito sendo digitado
       const parsed = parseInt(this._pendingDigit, 10);
       this._pendingDisplay = this._pendingDigit;
       this._pendingInvalid = parsed < this.min || parsed > this.max;
 
       if (this._digitTimeout) clearTimeout(this._digitTimeout);
       this._digitTimeout = setTimeout(() => {
-
         if (!isNaN(parsed) && parsed >= this.min && parsed <= this.max) {
           this._setValue(parsed);
         }
-
         this._pendingDigit = '';
         this._pendingInvalid = false;
         this._pendingDisplay = null;
@@ -135,7 +136,6 @@ export class SelectOneKnobWidget extends StateLitElement {
     this._pendingInvalid = false;
   }
 
-  // --- mouse drag ---
   private _onMouseDown(e: MouseEvent) {
     if (this.disabled) return;
     e.preventDefault();
@@ -144,6 +144,7 @@ export class SelectOneKnobWidget extends StateLitElement {
     this._dragStartValue = this._hasValue ? this.value! : this.min;
 
     const onMove = (ev: MouseEvent) => {
+      if (!this.selected) return;
       const delta = this._dragStartY - ev.clientY;
       if (Math.abs(delta) > 3) this._dragging = true;
       const steps = Math.round(delta / 8);
@@ -153,9 +154,6 @@ export class SelectOneKnobWidget extends StateLitElement {
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-      if (!this._dragging) {
-        (this.querySelector('[data-knob-root]') as HTMLElement)?.focus();
-      }
       this._dragging = false;
     };
 
@@ -163,15 +161,13 @@ export class SelectOneKnobWidget extends StateLitElement {
     window.addEventListener('mouseup', onUp);
   }
 
-  // --- scroll ---
   private _onWheel(e: WheelEvent) {
-    if (this.disabled) return;
+    if (!this._canInteract) return;
     e.preventDefault();
     const dir = e.deltaY < 0 ? 1 : -1;
     this._setValue((this._hasValue ? this.value! : this.min) + dir * this.step);
   }
 
-  // --- focus/blur ---
   private _onFocus() {
     if (this.disabled) return;
     this._focused = true;
@@ -185,13 +181,17 @@ export class SelectOneKnobWidget extends StateLitElement {
   }
 
   private _onClick() {
-    this.selected = !this.selected;
-    this.requestUpdate();
+    if (this.disabled) return;
+
+    if (this.selected && !this._dragging) {
+      this._cycleValue();
+    }
+
     this.dispatchEvent(new CustomEvent('knob-click', { bubbles: true, composed: false }));
   }
 
-  // --- ticks ---
   private _renderTicks() {
+    if (!this.showTicks) return '';
     const ticks = [];
     const total = this._tickCount;
     for (let i = 0; i < total; i++) {
@@ -216,6 +216,7 @@ export class SelectOneKnobWidget extends StateLitElement {
       this._hasValue ? 'has-value' : '',
       this._pendingDisplay !== null ? 'is-typing' : '',
       this._pendingInvalid ? 'is-invalid' : '',
+      !this.showTicks ? 'no-ticks' : '',
     ].filter(Boolean).join(' ');
 
     return html`
