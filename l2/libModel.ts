@@ -5,6 +5,17 @@ import { getTokensLess, removeTokensFromSource } from '/_102027_/l2/designSystem
 import { getPath } from '/_102027_/l2/utils.js';
 import { getDefsByFile } from '/_102027_/l2/libMindMap.js';
 
+export async function waitModelIdle(
+    model: mls.editor.IModelBase | undefined
+): Promise<void> {
+
+    const mm: IModelBase = model as IModelBase;
+    if (!mm?.processing) {
+        return;
+    }
+    await mm.processing.whenIdle();
+}
+
 export async function readProjectTypescriptAndCompile(project: number, shortName: string, needCompile: boolean = true) {
 
     if (projectsLoaded.includes(project)) return;
@@ -293,7 +304,11 @@ async function _createModel(storFile: mls.stor.IFileInfo, ext: Extesion, content
     const originalShortName: string | undefined = haveInfo ? info?.originalShortName : undefined;
     const originalFolder: string | undefined = haveInfo ? info?.originalFolder : undefined;
 
-    let model: mls.editor.IModelBase | undefined = await storFile.getOrCreateModel();
+    let model: IModelBase | undefined = await storFile.getOrCreateModel();
+    if (!model.processing) {
+        model.processing = new ModelProcessing();
+    }
+
     if (!model) throw new Error(`Model invalid`);
 
     if (ext === '.less' && storFile) {
@@ -351,10 +366,11 @@ async function _createModelAnyFile(storFile: mls.stor.IFileInfo) {
     const src = await storFile.getContent() as string;
     let model1 = monaco.editor.getModel(uri);
     if (!model1) model1 = monaco.editor.createModel(src, storFile.extension.replace('.', ''), uri);
-    const m: mls.editor.IModelBase = {
+    const m: IModelBase = {
         model: model1,
         storFile,
-        codeLens: {}
+        codeLens: {},
+        processing: new ModelProcessing()
     }
 
     setModelEventAny(m, storFile)
@@ -431,32 +447,82 @@ async function _getValueInfo(activeModel: mls.editor.IModelBase): Promise<mls.st
     return rc;
 }
 
-let _onChangedContent: number | undefined = undefined;
-function _onModelChange(e: monaco.editor.IModelContentChangedEvent, activeModel: mls.editor.IModelBase, storFile: mls.stor.IFileInfo): void {
+// let _onChangedContent: number | undefined = undefined;
+
+function _onModelChange(e: monaco.editor.IModelContentChangedEvent, activeModel: IModelBase, storFile: mls.stor.IFileInfo): void {
     // some changes is to simulate changes to force compile
+    // clearTimeout(_onChangedContent);
 
-    clearTimeout(_onChangedContent);
-    _onChangedContent = window.setTimeout(async () => {
+    clearTimeout(activeModel.changeTimeout);
+    if (activeModel.processing) {
+        activeModel.processing.end();
+        activeModel.processing.begin();
+    }
 
-        //_MarkCompileNeed(storFile); // fire and forgot
-        switch (storFile.extension) {
-            case ('.ts'):
-                const ignoreChanges = (e.changes.length === 1 && e.changes[0].range.startLineNumber === 1 && e.changes[0].range.endLineNumber === 1 && e.changes[0].range.endColumn <= 2);
-                await _updateModelStatusTS(activeModel, !ignoreChanges);
-                break;
-            case ('.html'):
-                await _updateModelStatusHTML(activeModel, true);
-                break;
-            case ('.less'):
-                await _updateModelStatusLess(activeModel, true);
-                break;
-            case ('.test.ts'):
-                await _updateModelStatusTest(activeModel, true);
-                break;
-            case ('.defs.ts'):
-                await _updateModelStatusDefs(activeModel, true);
-                break;
-            default: await _updateModelStatusAny(activeModel, true);;
+    activeModel.changeTimeout = window.setTimeout(async () => {
+
+        try {
+
+            switch (storFile.extension) {
+
+                case '.ts': {
+                    console.info('Modo TS')
+                    const ignoreChanges =
+                        (
+                            e.changes.length === 1
+                            && e.changes[0].range.startLineNumber === 1
+                            && e.changes[0].range.endLineNumber === 1
+                            && e.changes[0].range.endColumn <= 2
+                        );
+
+                    await _updateModelStatusTS(activeModel, !ignoreChanges);
+
+                    break;
+                }
+
+                case '.html': {
+
+                    await _updateModelStatusHTML(activeModel, true);
+
+                    break;
+                }
+
+                case '.less': {
+
+                    await _updateModelStatusLess(activeModel, true);
+
+                    break;
+                }
+
+                case '.test.ts': {
+
+                    await _updateModelStatusTest(activeModel, true);
+
+                    break;
+                }
+
+                case '.defs.ts': {
+
+                    await _updateModelStatusDefs(activeModel, true);
+
+                    break;
+                }
+
+                default: {
+
+                    await _updateModelStatusAny(activeModel, true);
+
+                    break;
+                }
+            }
+        }
+        catch (e) {
+
+            console.error('[onModelChange]', e);
+        }
+        finally {
+
+            if (activeModel.processing) activeModel.processing.end();
         }
 
     }, 400);
@@ -592,14 +658,13 @@ async function _updateModelStatusDefs(modelBase: mls.editor.IModelStyle, changed
 }
 
 async function _updateModelStatusAny(modelBase: mls.editor.IModelStyle, changed: boolean): Promise<void> {
-
     modelBase.storFile.hasError = false;
     await _checkSameContent(modelBase, modelBase.storFile);
-
-
 }
 
 async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: boolean): Promise<void> {
+    console.info('_updateModelStatusTS');
+
 
     if (!modelBase.storFile) throw new Error('Invalid stor file');
     const { project, shortName, folder } = modelBase.storFile;
@@ -610,6 +675,7 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: b
 
 
     const ok = await mls.l2.typescript.compileAndPostProcess(modelBase, true, true);
+    console.info('compileAndPostProcess ok');
 
     let hasError = ok === false;
     if (!hasError) {
@@ -620,6 +686,8 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: b
             if (!path) throw new Error('[_updateModelStatusTS] Not found path:' + enhacementName)
             const enhancementInstance: mls.l2.enhancement.IEnhancementInstance | undefined = await mls.l2.enhancement.getEnhancementModule(path).catch((e) => { console.error('Error on getEnhancementModule: ' + e.message); return undefined });
             if (enhancementInstance) await enhancementInstance.onAfterChange(modelBase);
+            console.info('enhancementInstance run ok');
+
         }
 
         hasError = modelBase.storFile.hasError;
@@ -631,6 +699,7 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: b
 }
 
 async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls.stor.IFileInfo, variables: mls.common.tripleslash.ITripleSlashVariables | undefined, hasError: boolean, changed: boolean): Promise<void> {
+    console.info('_changeStatusFile run ok');
 
     if (!storFile) return; // new file dont have storFile ???
     const position: 'left' | 'right' | 'all' = _getPosition(modelBase.model.id, mapExt[storFile.extension]);
@@ -641,7 +710,10 @@ async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls
 
     if (!hasError) monaco.editor.setModelMarkers(modelBase.model, 'markerSource', []);
 
+
     await _checkSameContent(modelBase, storFile);
+    console.info('Change file local stor ok')
+
     if (hasError) {
         _setErrorOnEditor(modelBase);
         _dispatchEventStatusOrErrorChanged(position, storFile);
@@ -651,6 +723,9 @@ async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls
     if (changed) {
         _dispatchEventStatusOrErrorChanged(position, storFile);
     }
+
+    console.info('Finish')
+
 }
 
 function _getPosition(modeIld: string, tp: 'ts' | 'html' | 'defs' | 'style' | 'test'): 'left' | 'right' | 'all' {
@@ -785,4 +860,82 @@ function getLineIndent(model: monaco.editor.ITextModel, lineNumber: number): num
         return match ? match[0].length : 0;
     }
     return 0;
+}
+
+
+// ------------------------------------------------------
+// TYPES
+// ------------------------------------------------------
+
+export interface IModelProcessing {
+
+    begin(): void;
+
+    end(): void;
+
+    whenIdle(): Promise<void>;
+
+    isProcessing(): boolean;
+}
+
+export class ModelProcessing implements IModelProcessing {
+
+    private running = 0;
+
+    private idlePromise: Promise<void> | null = null;
+
+    private idleResolve: (() => void) | null = null;
+
+    public begin(): void {
+
+        this.running++;
+
+        if (this.running === 1) {
+
+            this.idlePromise = new Promise<void>((resolve) => {
+
+                this.idleResolve = resolve;
+            });
+        }
+    }
+
+    public end(): void {
+
+        if (this.running > 0) {
+            this.running--;
+        }
+
+        if (this.running <= 0) {
+
+            this.running = 0;
+
+            if (this.idleResolve) {
+                this.idleResolve();
+            }
+
+            this.idleResolve = null;
+            this.idlePromise = null;
+        }
+    }
+
+    public async whenIdle(): Promise<void> {
+
+        if (this.running <= 0) {
+            return;
+        }
+
+        if (this.idlePromise) {
+            await this.idlePromise;
+        }
+    }
+
+    public isProcessing(): boolean {
+
+        return this.running > 0;
+    }
+}
+
+export interface IModelBase extends mls.editor.IModelBase {
+    changeTimeout?: number;
+    processing?: IModelProcessing;
 }
