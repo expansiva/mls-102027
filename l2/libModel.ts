@@ -466,7 +466,7 @@ function _onModelChange(e: monaco.editor.IModelContentChangedEvent, activeModel:
             switch (storFile.extension) {
 
                 case '.ts': {
-                    console.info('Modo TS')
+
                     const ignoreChanges =
                         (
                             e.changes.length === 1
@@ -663,8 +663,6 @@ async function _updateModelStatusAny(modelBase: mls.editor.IModelStyle, changed:
 }
 
 async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: boolean): Promise<void> {
-    console.info('_updateModelStatusTS');
-
 
     if (!modelBase.storFile) throw new Error('Invalid stor file');
     const { project, shortName, folder } = modelBase.storFile;
@@ -675,7 +673,6 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: b
 
 
     const ok = await mls.l2.typescript.compileAndPostProcess(modelBase, true, true);
-    console.info('compileAndPostProcess ok');
 
     let hasError = ok === false;
     if (!hasError) {
@@ -699,7 +696,6 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelBase, changed: b
 }
 
 async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls.stor.IFileInfo, variables: mls.common.tripleslash.ITripleSlashVariables | undefined, hasError: boolean, changed: boolean): Promise<void> {
-    console.info('_changeStatusFile run ok');
 
     if (!storFile) return; // new file dont have storFile ???
     const position: 'left' | 'right' | 'all' = _getPosition(modelBase.model.id, mapExt[storFile.extension]);
@@ -712,7 +708,6 @@ async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls
 
 
     await _checkSameContent(modelBase, storFile);
-    console.info('Change file local stor ok')
 
     if (hasError) {
         _setErrorOnEditor(modelBase);
@@ -724,7 +719,6 @@ async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls
         _dispatchEventStatusOrErrorChanged(position, storFile);
     }
 
-    console.info('Finish')
 
 }
 
