@@ -264,6 +264,48 @@ import {
 Derive \`{interfacePath}\` from the contract's \`fileReference\`, replacing \`.ts\` with \`.js\`.
 
 ---
+
+## I18n block
+
+When \`i18n\` is present in the JSON, generate the i18n block **between the imports and the class declaration**, using the mandatory markers:
+
+\`\`\`ts
+/// **collab_i18n_start**
+const message_en = {
+  loading: 'Loading...',
+  retry: 'Retry',
+  // one entry per key in i18n.keys
+};
+const message_pt = {
+  loading: 'Carregando...',
+  retry: 'Tentar novamente',
+};
+type MessageType = typeof message_en;
+const messages: { [key: string]: MessageType } = { en: message_en, pt: message_pt };
+/// **collab_i18n_end**
+\`\`\`
+
+> Generate one entry per key listed in \`i18n.keys\`. Generate all languages listed in \`i18n.languages\`. Use sensible translations — \`en\` for English, \`pt\` for Brazilian Portuguese.
+
+Inside the class body, declare \`msg\` as **\`protected\`** so the extending WebComponent can reassign it in its own \`render()\`:
+
+\`\`\`ts
+export class LoginShared extends CollabLitElement {
+  protected msg = messages['en'];
+
+  // ... @property(), @state(), methods ...
+}
+\`\`\`
+
+**Rules:**
+- Only generate the i18n block when \`i18n\` is present in the JSON. If absent, omit block and field entirely.
+- **\`message_en\` is mandatory** — always generate the English dictionary regardless of what \`i18n.languages\` lists. \`en\` is the fallback language used throughout the system.
+- Generate additional language dictionaries for every other language listed in \`i18n.languages\`.
+- Use **\`protected\`**, never \`private\` — the Render class inherits and overwrites this field at render time.
+- Never add keys not declared in \`i18n.keys\`. Never invent translations for keys not in the input.
+- The language resolution (\`document.documentElement.lang\`) is the **Render's** responsibility. The Shared only declares the block and the initial value.
+
+---
 ## interactionRuntime
 
 Allways implement this in \`connectedCallback()\` when something dispatches on mount (e.g. navigation with \`dispatchOnMount\) to ensure the page waits for the expected navigation load before rendering.
@@ -367,6 +409,10 @@ Array result: \`const res: user[] = Mock_user;\` (no \`[0]\`), assign directly t
 - Generate \`connectedCallback()\` when nothing dispatches on mount
 - **Invent \`@state()\` fields not present in the pages JSON** — every data, computed, temp, and action state must be traceable to the input
 - **Invent types, interfaces, or enums** not already declared in the contract — if something is missing, flag it as a discrepancy and do not fabricate it
+- Declare \`msg\` as \`private\` — it must be \`protected\` so the extending Render can reassign it
+- Generate the i18n block when \`i18n\` is absent from the JSON
+- Add i18n keys not declared in \`i18n.keys\`
+- Resolve the language (\`document.documentElement.lang\`) inside the Shared — that is the Render's responsibility
 
 ---
 `

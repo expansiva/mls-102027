@@ -3,6 +3,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import { getMaterializeOrchestrator } from '/_102027_/l2/agents/materialize/materializeOrchestrator.js';
 import { findPreviousAgentStep } from '/_102027_/l2/aiAgentHelper.js';
+import { convertFileNameToTag } from '/_102027_/l2/utils.js';
 
 export function createAgent(): IAgentAsync {
   return {
@@ -119,6 +120,12 @@ async function processOutput(context: mls.msg.ExecutionContext, output: any, age
 
   const orch = getMaterializeOrchestrator(output.path);
   await orch.createStorFile(output.outputPath, parseAISource(output.srcFile));
+
+  const info = mls.stor.convertFileReferenceToFile(output.outputPath);
+  if (info.project === 0) info.project = mls.actualProject || 0;
+  const tag = convertFileNameToTag(info);
+  const srcHtml = `<${tag}></${tag}>`;
+  await orch.createStorFile(output.outputPath.replace('.ts', '.html'), srcHtml);
 
   const stepOri = context.task ? (findPreviousAgentStep(context.task, parentStep.stepId))?.stepId : parentStep.stepId;
 
