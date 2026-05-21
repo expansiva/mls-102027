@@ -1,7 +1,7 @@
 /// <mls fileReference="_102027_/l2/libCompile.ts" enhancement="_blank"/>
 
 import { getTokensCss, getGlobalCss } from '/_102027_/l2/designSystemBase.js';
-import { convertFileNameToTag, convertTagToFileName, getPath } from '/_102027_/l2/utils';
+import { convertFileNameToTag, convertTagToFileName, getPath } from '/_102027_/l2/utils.js';
 
 export const getDependenciesByHtmlFile = (file: mls.stor.IFileInfo, html: string, theme: string, withCss: boolean = false): Promise<IJSONDependence> => {
     return new Promise<IJSONDependence>(async (resolve, reject) => {
