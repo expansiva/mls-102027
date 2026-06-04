@@ -186,18 +186,22 @@ async function* _processIntentsStream(
     let newIntents: mls.msg.AgentIntent[] = [];
 
     for (const hook of hooksToProcess) {
-        let agentToExecute: IAgentAsync | undefined = agent;
-        const agentByHookStep = getStepById(context.task, hook.stepId);
-        if (agentByHookStep && agentByHookStep.type === "agent" && agent.agentName !== (agentByHookStep as mls.msg.AIAgentStep).agentName) {
-            agentToExecute = await loadAgent((agentByHookStep as mls.msg.AIAgentStep).agentName);
-        }
-        if (!agentToExecute) throw new Error(`[${agentName}](startNewAiTask) Invalid agent in hook step`);
-        agent = agentToExecute;
-
         // ★ Yield: hook iniciando
         yield { type: 'hook-start', hookType: hook.type, stepId: hook.stepId };
 
-        const hookIntents = await processIntents2(agentToExecute, context, hook);
+        const resolved = await resolveHookAgent(agent, context, hook);
+        if (!resolved.agent) {
+            const error = `[${agentName}](startNewAiTask) ${resolved.error || 'Invalid agent in hook step'}`;
+            const combined = getHookFailureIntents(context, hook, error);
+            yield { type: 'error', error, stepId: hook.stepId };
+            yield { type: 'hook-done', hookType: hook.type, intents: combined };
+            newIntents.push(...combined);
+            continue;
+        }
+
+        agent = resolved.agent;
+
+        const hookIntents = await processIntents2(resolved.agent, context, hook);
         const removeIntents = getRemoveIntent(context, hook);
         const combined = [...hookIntents, ...removeIntents];
 
@@ -253,7 +257,63 @@ async function _processIntents(
     }
 }
 
-// ── processIntents2 (sem mudanças) ──────────────────────────────
+async function resolveHookAgent(
+    currentAgent: IAgentAsync,
+    context: mls.msg.ExecutionContext,
+    hook: mls.msg.AgentHooks
+): Promise<{ agent?: IAgentAsync; error?: string }> {
+
+    if (!context.task) return { error: 'Task not found while resolving hook agent' };
+
+    const hookStep = getStepById(context.task, hook.stepId);
+    if (!hookStep) return { error: `Step not found for hook stepId:${hook.stepId}` };
+
+    if (hookStep.type !== 'agent') return { agent: currentAgent };
+
+    const hookAgentName = (hookStep as mls.msg.AIAgentStep).agentName;
+    if (!hookAgentName) return { error: `Agent name not found for hook stepId:${hook.stepId}` };
+    if (currentAgent.agentName === hookAgentName) return { agent: currentAgent };
+
+    const hookAgent = await loadAgent(hookAgentName);
+    if (!hookAgent) return { error: `Agent not found:${hookAgentName}` };
+
+    return { agent: hookAgent as IAgentAsync };
+}
+
+function getHookFailureIntents(
+    context: mls.msg.ExecutionContext,
+    hook: mls.msg.AgentHooks,
+    error: string,
+    removeHook = true
+): mls.msg.AgentIntent[] {
+
+    console.error(error);
+    if (!context.task) return [];
+
+    const parentStepId = (hook as { parentStepId?: number }).parentStepId;
+    const step = getStepById(context.task, hook.stepId);
+    const parentStep = typeof parentStepId === 'number'
+        ? getStepById(context.task, parentStepId)
+        : null;
+
+    const removeIntents = removeHook ? getRemoveIntent(context, hook) : [];
+    if (!step || !parentStep) return removeIntents;
+
+    const updateStatusFailed: mls.msg.AgentIntentUpdateStatus = {
+        type: 'update-status',
+        hookSequential: hook.hookSequential,
+        messageId: context.message.orderAt,
+        threadId: context.message.threadId,
+        taskId: context.task?.PK || '',
+        parentStepId: parentStep.stepId,
+        stepId: step.stepId,
+        status: 'failed'
+    };
+
+    return [updateStatusFailed, ...removeIntents];
+}
+
+// ── processIntents2 ─────────────────────────────────────────────
 
 async function processIntents2(agent: IAgentAsync, context: mls.msg.ExecutionContext, hook: mls.msg.AgentHooks): Promise<mls.msg.AgentIntent[]> {
 
@@ -265,21 +325,8 @@ async function processIntents2(agent: IAgentAsync, context: mls.msg.ExecutionCon
         throw new Error(`not implemented processIntents process hooks, type:${hook.type}`);
     } catch (e: any) {
 
-        console.error(`error processing taskid:${context.task?.PK}, hook:${hook.type}, message:${e.message || e} `);
-        if (!context.task) return [];
-        const step = getStepById(context.task, hook.stepId) as mls.msg.AIAgentStep;
-        const parentStep = getStepById(context.task, (hook as mls.msg.AgentHookAfterPromptStep).parentStepId) as mls.msg.AIAgentStep;
-        const updateStatusFailed: mls.msg.AgentIntentUpdateStatus = {
-            type: 'update-status',
-            hookSequential: 0,
-            messageId: context.message.orderAt,
-            threadId: context.message.threadId,
-            taskId: context.task?.PK || '',
-            parentStepId: parentStep.stepId,
-            stepId: step.stepId,
-            status: 'failed'
-        };
-        return [updateStatusFailed];
+        const error = `error processing taskid:${context.task?.PK}, hook:${hook.type}, message:${e.message || e}`;
+        return getHookFailureIntents(context, hook, error, false);
     }
 }
 
@@ -432,10 +479,18 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
 
     const intentsFromHooks = (
         await Promise.all(
-            hooksToProcess.map(async hook => [
-                ...(await processIntents2(agent, context, hook)),
-                ...getRemoveIntent(context, hook),
-            ])
+            hooksToProcess.map(async hook => {
+                const resolved = await resolveHookAgent(agent, context, hook);
+                if (!resolved.agent) {
+                    const error = `[${agentName}](continuePoolingTask) ${resolved.error || 'Invalid agent in hook step'}`;
+                    return getHookFailureIntents(context, hook, error);
+                }
+
+                return [
+                    ...(await processIntents2(resolved.agent, context, hook)),
+                    ...getRemoveIntent(context, hook),
+                ];
+            })
         )
     ).flat();
 
