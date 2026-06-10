@@ -153,6 +153,19 @@ export type IAgentLifecycleHooks = {
     ,
   ): Promise<HTMLElement>
 
+  /**
+   * Optional: render a re-openable view for one of the agent's steps (e.g. a summary/management
+   * screen). When an agent implements this, the step list shows an "open" link next to "details",
+   * and clicking it mounts the returned element. Unlike beforeClarificationStep, this is read/view
+   * oriented and can be invoked any time (including after the step/task completed), so the screen
+   * must rebuild its state from persisted artifacts rather than the live step payload.
+   */
+  openStepView?(
+    agent: IAgentMeta,
+    context: mls.msg.ExecutionContext,
+    step: mls.msg.AIAgentStep,
+  ): Promise<HTMLElement>
+
 }
 
 export interface ITool {
