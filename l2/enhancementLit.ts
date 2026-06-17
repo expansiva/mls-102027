@@ -3,8 +3,8 @@
 import { convertFileNameToTag } from '/_102027_/l2/utils.js'
 import { getPropierties } from '/_102027_/l2/propiertiesLit.js'
 import { validateTagName, validateRender } from '/_102027_/l2/validateLit.js';
-import { setCodeLens } from '/_102027_/l2/codeLensLit';
-import { injectStyle, injectStyleAction } from '/_102027_/l2/processCssLit'
+import { setCodeLens } from '/_102027_/l2/codeLensLit.js';
+import { injectStyle, injectStyleAction } from '/_102027_/l2/processCssLit.js'
 
 export const requires: mls.l2.enhancement.IRequire[] = [
     {

@@ -48,15 +48,15 @@
  * @packageDocumentation
  */
 
-import { PropertyValues, ReactiveElement } from '/_102027_/l2/reactiveElement';
-import { RenderOptions, LitUnstable } from '/_102027_/l2/litHtml';
-import { ReactiveUnstable } from '/_102027_/l2/reactiveElement';
+import { PropertyValues, ReactiveElement } from '/_102027_/l2/reactiveElement.js';
+import { RenderOptions, LitUnstable } from '/_102027_/l2/litHtml.js';
+import { ReactiveUnstable } from '/_102027_/l2/reactiveElement.js';
 
-export * from '/_102027_/l2/reactiveElement';
-export * from '/_102027_/l2/litHtml';
+export * from '/_102027_/l2/reactiveElement.js';
+export * from '/_102027_/l2/litHtml.js';
 export * from '/_102027_/l2/classMap.js';
 export * from '/_102027_/l2/ifDefined.js';
-export * from '/_102027_/l2/live.js'
+export * from '/_102027_/l2/live.js';
 export * from '/_102027_/l2/styleMap.js';
 
 

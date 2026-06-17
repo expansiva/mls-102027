@@ -1,6 +1,6 @@
 /// <mls fileReference="_102027_/l2/libStor.ts" enhancement="_blank"/>
 
-import { convertFileNameToTag } from '/_102027_/l2/utils';
+import { convertFileNameToTag } from '/_102027_/l2/utils.js';
 import { createModel, createAllModels } from '/_102027_/l2/libModel.js'
 import { getBaseTemplate, verifyNeedAddTripleslach } from '/_102027_/l2/libCommom.js';
 
