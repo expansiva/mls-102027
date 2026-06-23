@@ -181,7 +181,7 @@ export async function scanL1DefsWithPipeline(
 export function scanL2PageDefsFiles(project: number, moduleName: string): ScannedDefsFile[] {
   const result: ScannedDefsFile[] = [];
   try {
-    const SKIP = new Set(['layer_2_contracts', 'project']);
+    const SKIP = new Set(['layer_2_contracts', 'project', 'module', 'index']);
     for (const f of Object.values(mls.stor.files as Record<string, any>)) {
       if (f.project !== project) continue;
       if (f.level !== 2) continue;
@@ -502,7 +502,7 @@ export async function saveGeneratedTs(
       if (model) model.model.setValue(content);
     }
     await mls.stor.localStor.setContent(file, { contentType: 'string', content });
-    if (!shortName.endsWith('.defs')) compileGeneratedTs(project, level, folder, shortName);
+    if (!shortName.endsWith('.defs')) await compileGeneratedTs(project, level, folder, shortName);
     return true;
   } catch (err) {
     console.warn('[artifactsMaterialize] saveGeneratedTs failed', err);
@@ -510,22 +510,17 @@ export async function saveGeneratedTs(
   }
 }
 
-function compileGeneratedTs(project: number, level: number, folder: string, shortName: string): void {
+async function compileGeneratedTs(project: number, level: number, folder: string, shortName: string): Promise<void> {
   try {
     const editorKey = mls.editor.getKeyModel(project, shortName, folder, level);
     let modelBase = mls.editor.models[editorKey];
     if (!modelBase) {
-      mls.editor.addModels(project, shortName, folder, level).then((m: any) => {
-        if (!m) return;
-        const modelTs = m?.ts;
-        if (modelTs && modelTs.compilerResults) modelTs.compilerResults.modelNeedCompile = true;
-        mls.l2.typescript.compileAndPostProcess(m, true, true);
-      }).catch(() => {});
-      return;
+      modelBase = await mls.editor.addModels(project, shortName, folder, level) as mls.editor.IModels;
     }
-    const modelTs = modelBase?.ts;
+    const modelTs = modelBase?.ts as mls.editor.IModelTS;
+    if (!modelTs) return;
     if (modelTs && modelTs.compilerResults) modelTs.compilerResults.modelNeedCompile = true;
-    mls.l2.typescript.compileAndPostProcess(modelBase, true, true);
+    await mls.l2.typescript.compileAndPostProcess(modelTs, true, true);
   } catch (err) {
     console.warn('[artifactsMaterialize] compileGeneratedTs failed', err);
   }
@@ -644,21 +639,15 @@ export async function compileAndGetErrors(
   shortName: string,
 ): Promise<string[]> {
   try {
-    // Ensure Monaco model exists and capture it (required before compile)
-    const storKey = mls.stor.getKeyToFile({ project, level, folder, shortName, extension: '.ts' });
-    const file = (mls.stor.files as Record<string, any>)[storKey];
-    const storModel = file ? await file.getOrCreateModel() : null;
 
     const editorKey = mls.editor.getKeyModel(project, shortName, folder, level);
     let modelBase = mls.editor.models[editorKey];
     if (!modelBase) {
-      modelBase = await mls.editor.addModels(project, shortName, folder, level);
+      modelBase = await mls.editor.addModels(project, shortName, folder, level) as mls.editor.IModels;
     }
     if (!modelBase) return [];
     const modelTs = modelBase?.ts;
     if (!modelTs) return [];
-    // Bridge: assign the Monaco model if the editor model doesn't have it yet
-    if (!modelTs.model && storModel?.model) modelTs.model = storModel.model;
     if (!modelTs.model) return [];
     if (modelTs.compilerResults) modelTs.compilerResults.modelNeedCompile = true;
     await mls.l2.typescript.compile(modelTs);
