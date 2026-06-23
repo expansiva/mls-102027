@@ -214,7 +214,7 @@ function buildSystemPrompt(skillSections: string[], outputPath: string): string 
     ? skillSections.join('\n\n---\n\n')
     : '<!-- no skill loaded -->';
 
-  return `<!-- modelType: codeinstruct -->
+  return `<!-- modelType: codeinstruct2 -->
 
 You generate a TypeScript file based on a definition and context files.
 
