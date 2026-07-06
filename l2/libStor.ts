@@ -2,7 +2,7 @@
 
 import { convertFileNameToTag } from '/_102027_/l2/utils.js';
 import { createModel, createAllModels } from '/_102027_/l2/libModel.js'
-import { getBaseTemplate, verifyNeedAddTripleslach } from '/_102027_/l2/libCommom.js';
+import { getBaseTemplate, verifyNeedAddTripleslach, isStorContentEqualTemplateDefault } from '/_102027_/l2/libCommom.js';
 
 
 export async function createStorFile(req: IReqCreateStorFile, needCreateModel: boolean, needCompile: boolean = true, awaitCompile: boolean = false): Promise<mls.stor.IFileInfo> {
@@ -130,6 +130,29 @@ export async function deleteAllFiles(storFile: mls.stor.IFileInfo): Promise<void
         await deleteFile(mls.stor.files[key]);
 
     }
+
+}
+
+export async function removeNewStorFilesWithTemplateDefault(): Promise<mls.stor.IFileInfo[]> {
+
+    const removed: mls.stor.IFileInfo[] = [];
+    const project = mls.actualProject;
+    if (!project) return removed;
+
+    // snapshot: deleteFile remove entradas de mls.stor.files durante o loop
+    const files = Object.values(mls.stor.files).filter((f) => f && f.project === project && f.status === 'new');
+
+    for await (const storFile of files) {
+
+        const isTemplate = await isStorContentEqualTemplateDefault(storFile);
+        if (!isTemplate) continue;
+
+        await deleteFile(storFile); // status 'new' -> remoção real (deleteFileSystem)
+        removed.push(storFile);
+
+    }
+
+    return removed;
 
 }
 
