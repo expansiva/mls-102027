@@ -966,6 +966,18 @@ export const languages: ICollabLanguage[] = [
         "svg": "<svg height=\"32\" viewbox=\"0 0 32 32\" width=\"32\" xmlns=\"http://www.w3.org/2000/svg\">\n<rect fill=\"#459a45\" height=\"24\" rx=\"4\" ry=\"4\" width=\"30\" x=\"1\" y=\"4\"></rect>\n<path d=\"M27,4H5c-2.209,0-4,1.791-4,4V24c0,2.209,1.791,4,4,4H27c2.209,0,4-1.791,4-4V8c0-2.209-1.791-4-4-4Zm3,20c0,1.654-1.346,3-3,3H5c-1.654,0-3-1.346-3-3V8c0-1.654,1.346-3,3-3H27c1.654,0,3,1.346,3,3V24Z\" opacity=\".15\"></path>\n<path d=\"M3.472,16l12.528,8,12.528-8-12.528-8L3.472,16Z\" fill=\"#fedf00\"></path>\n<circle cx=\"16\" cy=\"16\" fill=\"#0a2172\" r=\"5\"></circle>\n<path d=\"M14,14.5c-.997,0-1.958,.149-2.873,.409-.078,.35-.126,.71-.127,1.083,.944-.315,1.951-.493,2.999-.493,2.524,0,4.816,.996,6.519,2.608,.152-.326,.276-.666,.356-1.026-1.844-1.604-4.245-2.583-6.875-2.583Z\" fill=\"#fff\"></path>\n<path d=\"M27,5H5c-1.657,0-3,1.343-3,3v1c0-1.657,1.343-3,3-3H27c1.657,0,3,1.343,3,3v-1c0-1.657-1.343-3-3-3Z\" fill=\"#fff\" opacity=\".2\"></path>\n</svg>"
     },
     {
+        "name": "Portuguese (Brazil)",
+        "code": "pt-BR",
+        "country": "Brazil",
+        "svg": "<svg height=\"32\" viewbox=\"0 0 32 32\" width=\"32\" xmlns=\"http://www.w3.org/2000/svg\">\n<rect fill=\"#459a45\" height=\"24\" rx=\"4\" ry=\"4\" width=\"30\" x=\"1\" y=\"4\"></rect>\n<path d=\"M27,4H5c-2.209,0-4,1.791-4,4V24c0,2.209,1.791,4,4,4H27c2.209,0,4-1.791,4-4V8c0-2.209-1.791-4-4-4Zm3,20c0,1.654-1.346,3-3,3H5c-1.654,0-3-1.346-3-3V8c0-1.654,1.346-3,3-3H27c1.654,0,3,1.346,3,3V24Z\" opacity=\".15\"></path>\n<path d=\"M3.472,16l12.528,8,12.528-8-12.528-8L3.472,16Z\" fill=\"#fedf00\"></path>\n<circle cx=\"16\" cy=\"16\" fill=\"#0a2172\" r=\"5\"></circle>\n<path d=\"M14,14.5c-.997,0-1.958,.149-2.873,.409-.078,.35-.126,.71-.127,1.083,.944-.315,1.951-.493,2.999-.493,2.524,0,4.816,.996,6.519,2.608,.152-.326,.276-.666,.356-1.026-1.844-1.604-4.245-2.583-6.875-2.583Z\" fill=\"#fff\"></path>\n<path d=\"M27,5H5c-1.657,0-3,1.343-3,3v1c0-1.657,1.343-3,3-3H27c1.657,0,3,1.343,3,3v-1c0-1.657-1.343-3-3-3Z\" fill=\"#fff\" opacity=\".2\"></path>\n</svg>"
+    },
+    {
+        "name": "Portuguese (Portugal)",
+        "code": "pt-PT",
+        "country": "Portugal",
+        "svg": "<svg height=\"32\" viewbox=\"0 0 32 32\" width=\"32\" xmlns=\"http://www.w3.org/2000/svg\">\n<rect fill=\"#cb2e40\" height=\"24\" rx=\"4\" ry=\"4\" width=\"30\" x=\"1\" y=\"4\"></rect>\n<path d=\"M13,4H5c-2.209,0-4,1.791-4,4V24c0,2.209,1.791,4,4,4h8V4Z\" fill=\"#2c6837\"></path>\n<circle cx=\"13\" cy=\"16\" fill=\"#fedf00\" r=\"5\"></circle>\n<circle cx=\"13\" cy=\"16\" fill=\"#cb2e40\" r=\"3\"></circle>\n<circle cx=\"13\" cy=\"16\" fill=\"#fff\" r=\"1.5\"></circle>\n<path d=\"M27,4H5c-2.209,0-4,1.791-4,4V24c0,2.209,1.791,4,4,4H27c2.209,0,4-1.791,4-4V8c0-2.209-1.791-4-4-4Zm3,20c0,1.654-1.346,3-3,3H5c-1.654,0-3-1.346-3-3V8c0-1.654,1.346-3,3-3H27c1.654,0,3,1.346,3,3V24Z\" opacity=\".15\"></path>\n<path d=\"M27,5H5c-1.657,0-3,1.343-3,3v1c0-1.657,1.343-3,3-3H27c1.657,0,3,1.343,3,3v-1c0-1.657-1.343-3-3-3Z\" fill=\"#fff\" opacity=\".2\"></path>\n</svg>"
+    },
+    {
         "name": "Punjabi, Panjabi",
         "code": "pa",
         "country": "India",
@@ -1295,4 +1307,18 @@ export interface ICollabLanguage {
     name: string,
     country: string,
     svg: string
+}
+
+/**
+ * Resolves a language entry by BCP 47 code.
+ * Tries an exact (case-insensitive) match first — e.g. "pt-BR" —
+ * then falls back to the base language — e.g. "pt-AO" -> "pt".
+ */
+export function findLanguageByCode(code: string): ICollabLanguage | undefined {
+    if (!code) return undefined;
+    const normalized = code.toLowerCase();
+    const exact = languages.find((lang) => lang.code.toLowerCase() === normalized);
+    if (exact) return exact;
+    const base = normalized.split('-')[0];
+    return languages.find((lang) => lang.code.toLowerCase() === base);
 }
