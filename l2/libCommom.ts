@@ -681,6 +681,33 @@ export async function getBaseTemplate(file: IInfoFile, enhancement: string = '_b
 
 }
 
+export async function isStorContentEqualTemplateDefault(storFile: mls.stor.IFileInfo): Promise<boolean> {
+
+    try {
+        const content = await storFile.getContent();
+        if (typeof content !== 'string' || !content) return false;
+
+        // usa o enhancement do próprio tripleslash do arquivo para gerar o template equivalente
+        let enhancement = '_blank';
+        const firstLine = content.split('\n')[0] || '';
+        if (firstLine.startsWith('/// <mls')) {
+            const parsed = mls.common.tripleslash.parseXMLTripleSlash(firstLine);
+            if (parsed?.variables?.enhancement) enhancement = parsed.variables.enhancement;
+        }
+
+        const { project, folder, shortName, extension } = storFile;
+        const template = await getBaseTemplate({ project, folder, shortName, extension }, enhancement);
+        if (!template) return false;
+
+        const normalize = (src: string) => src.replace(/\r\n/g, '\n').trim();
+        return normalize(content) === normalize(template);
+
+    } catch (e) {
+        return false;
+    }
+
+}
+
 export function verifyNeedAddTripleslach(info: mls.stor.IFileInfoBase, src: string, extension: string, enhancement: string = '_blank'): string {
 
     if (!['.ts', '.defs.ts', '.test.ts', '.less'].includes(extension)) return src;
