@@ -1,7 +1,15 @@
 /// <mls fileReference="_102027_/l2/designSystemBase.ts" enhancement="_blank" />
 
 import { collabImport } from '/_102027_/l2/collabImport.js';
-import { getFontLoadsCss, DsFont } from '/_102029_/l2/designSystemBase.js';
+// Pure design-system core lives in the runtime-clean _102029_ module; the editor imports it
+// (never the reverse) and adds only its editor-specific functions below.
+import {
+    getDarkAndLight, convertLessTokensToCss, tokensCssFromTheme, removeTokensFromSource,
+    type IDesignSystemTokens, type IDesignSystem,
+} from '/_102029_/l2/designSystemBase.js';
+// Re-export the pieces existing importers of THIS module still reach for (single definitions
+// now live in _102029_): the tokens interface + the marker-block stripper.
+export { removeTokensFromSource, type IDesignSystemTokens };
 
 export async function getTokens(project: number): Promise<IDesignSystemTokens[]> {
     const fileName = `./_${project}_designSystem`;
@@ -60,24 +68,9 @@ export async function getTokensCss(project: number, theme: string): Promise<stri
     }
 
     try {
-        const prefix = ':root';
-
         const tokenInfo = tokens.find(item => item.themeName === theme);
         if (!tokenInfo) return '';
-
-        const allTokens = {
-            ...tokenInfo.color,
-            ...tokenInfo.typography,
-            ...tokenInfo.global
-        };
-
-        const themedTokens = getDarkAndLight(allTokens);
-        const cssVars = getCssVars(themedTokens, prefix);
-        const tokensCss = convertLessTokensToCss(cssVars, themedTokens.root);
-
-        const fontLoads = getFontLoadsCss(tokenInfo.fonts);
-        return fontLoads ? `${fontLoads}\n${tokensCss}` : tokensCss;
-
+        return tokensCssFromTheme(tokenInfo); // shared pipeline (:root + [data-theme="dark"], :root.dark + font loads)
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`[getTokensCss] Error compiling tokens: ${message}`);
@@ -220,84 +213,6 @@ export async function preCompileLessByThemeOrDefault(project: number, less: stri
 
 }
 
-function getDarkAndLight(allTokens: IKeyValueToken): IDarkLight {
-    const themes: IDarkLight = {};
-
-    Object.entries(allTokens).forEach((entry) => {
-        const [key, value] = entry;
-        const [theme] = key.split('-');
-        let themeName = 'root';
-        if (theme === '_dark') themeName = 'dark';
-        if (!themes[themeName]) themes[themeName] = {};
-        themes[themeName][key] = value;
-    });
-
-    return themes;
-}
-
-function getCssVars(themes: IDarkLight, prefix: ':host' | ':root') {
-    const cssArr: string[] = [];
-    Object.entries(themes).forEach((entry) => {
-        const [key, value] = entry;
-        if (key === 'root') {
-
-            const cssVars: string[] = [];
-            Object.entries(value).forEach((entryTokens) => {
-                const [keyToken, valueToken] = entryTokens;
-                const cssVar = `--${keyToken}: ${valueToken};`;
-                cssVars.push(cssVar);
-            });
-            const cssFinal = `${prefix}{\n\t${cssVars.join('\n\t')}\n}`;
-            cssArr.push(cssFinal);
-
-        } else {
-
-            const cssVars: string[] = [];
-            Object.entries(value).forEach((entryTokensDark) => {
-                const [keyToken, valueToken] = entryTokensDark;
-                const tokenKey = keyToken.substring(1 + key.length + 1, keyToken.length);
-                const cssVar = `--${tokenKey}: ${valueToken};`;
-                cssVars.push(cssVar);
-            });
-            const cssFinal = `[data-theme="dark"], :root.dark {\n\t${cssVars.join('\n\t')}\n}`;
-            cssArr.push(cssFinal);
-        }
-    });
-
-    return cssArr.join('\n');
-}
-
-function convertLessTokensToCss(less: string, tokens: IKeyValueToken): string {
-
-    const lessTokens = new Set(Object.keys(tokens));
-    return less.replace(/@([a-zA-Z0-9-_]+)/g, (match, token, offset, fullText) => {
-        if (!lessTokens.has(token)) {
-            return match;
-        }
-
-        const beforeText = fullText.slice(0, offset);
-        const insideMediaQuery = /@media\s*\([^{}]*$/.test(beforeText);
-        const lessFunctions = [
-            "lighten", "darken", "saturate", "desaturate", "fadein", "fadeout", "fade",
-            "spin", "mix", "tint", "shade", "contrast", "ceil", "floor", "round", "abs",
-            "sqrt", "pow", "mod", "min", "max", "escape", "e", "unit", "convert",
-            "extract", "length"
-        ];
-
-        const insideLessFunction = new RegExp(`(${lessFunctions.join("|")})\\s*\\([^()]*$`, "i").test(beforeText);
-        if (insideMediaQuery || insideLessFunction) {
-            return match;
-        }
-
-        return `var(--${token})`;
-    });
-}
-
-export function removeTokensFromSource(src: string) {
-    const regex = /\/\/Start Less Tokens[\s\S]*?\/\/End Less Tokens/g;
-    return src.replace(regex, '');
-}
-
 export async function removeTokensTheme(project: number, themeName: string): Promise<void> {
     const actualTokens = await getTokens(project);
     const themeIndex = actualTokens.findIndex((theme) => theme.themeName === themeName);
@@ -328,26 +243,4 @@ async function serializeTokens(project: number, tokens: IDesignSystemTokens[]) {
 export function replaceTokensBlock(code: string, newContent: string): string {
     const regex = /export\s+const\s+tokens\s*:\s*IDesignSystemTokens\[\]\s*=\s*\[[\s\S]*?\];?/g;
     return code.replace(regex, `export const tokens: IDesignSystemTokens[] = [\n${newContent}\n]`);
-}
-
-export interface IDesignSystemTokens {
-    description: string,
-    themeName: string,
-    color: Record<string, string>,
-    global: Record<string, string>,
-    typography: Record<string, string>,
-    /** Font roles that need LOADING (@import/@font-face) — see DsFont in _102029_/l2/designSystemBase. */
-    fonts?: DsFont[],
-}
-
-export interface IDesignSystem {
-    tokens: IDesignSystemTokens[]
-}
-
-interface IKeyValueToken {
-    [x: string]: string
-}
-
-export interface IDarkLight {
-    [theme: string]: IKeyValueToken
 }
