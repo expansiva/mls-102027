@@ -346,7 +346,7 @@ function onMonacoModelCreated(ev: mls.events.IEvent) {
     const storFileBase = mls.stor.convertFileReferenceToFile(ev.desc || '');
     const key = mls.stor.getKeyToFile(storFileBase);
     const storFile = mls.stor.files[key];
-    if (!storFile) return; // ignore, error
+    if (!storFile || !storFile.project) return;
 
     storFile.getOrCreateModel().then(async (model: mls.editor.IModelBase) => {
         if (!model) return;
@@ -678,7 +678,7 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelTS, changed: boo
     const ok = await mls.l2.typescript.compileAndPostProcess(modelBase, true, level === 2);
 
     let hasError = ok === false && (modelBase.compilerResults && modelBase.compilerResults.errors.length > 0);
-    
+
     if (!hasError) {
 
         const enhacementName = await getEnhancementName({ project, shortName, folder, level: 2 }).catch((e: any) => undefined);
@@ -762,8 +762,8 @@ async function _checkSameContent(modelBase: mls.editor.IModelBase, storFile: mls
 async function setOriginalCrc(model: mls.editor.IModelBase) {
 
     const info = model.storFile.getValueInfo ? await model.storFile.getValueInfo() : null;
-            
-    let originalCRC =  info && info.originalCRC ? info.originalCRC : mls.common.crc.crc32(model.model.getValue()).toString(16);
+
+    let originalCRC = info && info.originalCRC ? info.originalCRC : mls.common.crc.crc32(model.model.getValue()).toString(16);
 
     if (model.storFile.extension === '.less') {
         originalCRC = info && info.originalCRC ? info.originalCRC : mls.common.crc.crc32(removeTokensFromSource(model.model.getValue()).trim()).toString(16)
