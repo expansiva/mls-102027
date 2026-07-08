@@ -95,12 +95,7 @@ export async function createConfigFile(project: number): Promise<mls.l5_common.P
 async function _createConfigFile(project: number) {
     const newConfig: mls.l5_common.ProjectConfig = {
         orgName: '[org]',
-        designSystems: {
-            "1": {
-                name: "default",
-                description: "Default design system"
-            }
-        },
+        designSystems: [],
         languages: [
             {
                 language: "en",
