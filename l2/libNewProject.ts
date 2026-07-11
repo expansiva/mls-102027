@@ -274,7 +274,7 @@ export class PluginCollabCoreIndex extends PluginBaseIndex {
                 scope: ['l7ServicesRight', 'l6ServicesRight', 'l5ServicesRight', 'l4ServicesRight', 'l3ServicesRight', 'l2ServicesRight', 'l1ServicesRight'],
                 priority: 3,
                 auth: ['*'],
-                widget: '_100554_serviceCollabMessages'
+                widget: '_102020_serviceCollabMessages'
             },
             {
                 category: 'Services',
