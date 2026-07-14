@@ -49,10 +49,10 @@ export const template_tsconfig = {
         "strictNullChecks": false,
         "paths": {
             "/_[project]_/*": [
-                "./*"
+                "./project/_[project]_/*"
             ],
             "/_102027_/*": [
-                "node_modules/mls-102027/*"
+                "./project/mls-102027/*"
             ]
         },
         "lib": [
@@ -162,13 +162,13 @@ jobs:
     - name: Fix package name
       run: |
         if [ -f packagelib.json ]; then
-          mv packagelib.json package.json
+          cp packagelib.json package.json
         fi
 
     - name: Fix tsconfig name
       run: |
         if [ -f tsconfiglib.json ]; then
-          mv tsconfiglib.json tsconfig.json
+          cp tsconfiglib.json tsconfig.json
         fi
         
     - name: Install dependencies
