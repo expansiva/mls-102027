@@ -132,110 +132,115 @@ async function* _processIntentsStream(
     signal: AbortSignal
 ): AsyncGenerator<OrchestrationEvent, void, unknown> {
 
-    if (signal.aborted) return;
+    let currentIntents = intents;
 
-    const oldContextCreateAt = context.message.createAt;
-    const isAddMessageAI = intents.some(i => i.type === 'add-message-ai');
+    for (;;) {
+        if (signal.aborted) return;
 
-    const value = await msgApplyIntents({
-        userId: context.message.senderId,
-        intents
-    });
+        const oldContextCreateAt = context.message.createAt;
+        const isAddMessageAI = currentIntents.some(i => i.type === 'add-message-ai');
 
-    if (!value) throw new Error(`[${agentName}] Error on msgApplyIntents`);
-    if (value.statusCode !== 200) throw new Error(`[${agentName}] Error: ${value.msg || ''}`);
-    if (signal.aborted) return;
+        const value = await msgApplyIntents({
+            userId: context.message.senderId,
+            intents: currentIntents
+        });
 
-    const ret = value as mls.msg.ResponseApplyIntents;
-    context.task = ret.task;
-    if (ret.message) context.message = ret.message;
-    // Persist before notifying: listeners react to 'task-change' synchronously
-    // and resolve via storage.getTask (e.g. getAgentContext). Notifying before
-    // the store is updated makes them read a stale task — which left the second
-    // clarification stuck on "Processing..." until a manual task click.
-    await storage.addOrUpdateTask(ret.task);
-    notifyTaskChange(context, isAddMessageAI ? oldContextCreateAt : undefined);
+        if (!value) throw new Error(`[${agentName}] Error on msgApplyIntents`);
+        if (value.statusCode !== 200) throw new Error(`[${agentName}] Error: ${value.msg || ''}`);
+        if (signal.aborted) return;
 
-    // ★ Yield: task criada / intents aplicados
-    yield {
-        type: 'task-created',
-        taskId: ret.task.PK,
-        task: ret.task,
-        message: ret.message
-    };
-    yield {
-        type: 'intents-applied',
-        task: ret.task,
-        message: context.message
-    };
+        const ret = value as mls.msg.ResponseApplyIntents;
+        context.task = ret.task;
+        if (ret.message) context.message = ret.message;
+        // Persist before notifying: listeners react to 'task-change' synchronously
+        // and resolve via storage.getTask (e.g. getAgentContext). Notifying before
+        // the store is updated makes them read a stale task — which left the second
+        // clarification stuck on "Processing..." until a manual task click.
+        await storage.addOrUpdateTask(ret.task);
+        notifyTaskChange(context, isAddMessageAI ? oldContextCreateAt : undefined);
 
-    if (!context.task?.iaCompressed) {
-        yield { type: 'done' };
-        return;
-    }
+        // ★ Yield: task criada / intents aplicados
+        yield {
+            type: 'task-created',
+            taskId: ret.task.PK,
+            task: ret.task,
+            message: ret.message
+        };
+        yield {
+            type: 'intents-applied',
+            task: ret.task,
+            message: context.message
+        };
 
-    runningTasks.add(ret.task.PK);
-
-    await storage.addPooling({
-        taskId: ret.task.PK,
-        userId: context.task?.owner ?? '',
-        startAt: Date.now().toString()
-    });
-
-    yield { type: 'pooling-start', taskId: ret.task.PK };
-
-    if (signal.aborted) return;
-
-    let _hooks = context.task.iaCompressed.queueFrontEnd || [];
-    const hooksToProcess = selectHooksToProcess(_hooks.filter(h => h.type !== 'pooling'));
-
-    let newIntents: mls.msg.AgentIntent[] = [];
-
-    for (const hook of hooksToProcess) {
-        // ★ Yield: hook iniciando
-        yield { type: 'hook-start', hookType: hook.type, stepId: hook.stepId };
-
-        const resolved = await resolveHookAgent(agent, context, hook);
-        if (!resolved.agent) {
-            const error = `[${agentName}](startNewAiTask) ${resolved.error || 'Invalid agent in hook step'}`;
-            const combined = getHookFailureIntents(context, hook, error);
-            yield { type: 'error', error, stepId: hook.stepId };
-            yield { type: 'hook-done', hookType: hook.type, intents: combined };
-            newIntents.push(...combined);
-            continue;
-        }
-
-        agent = resolved.agent;
-
-        const hookIntents = await processIntents2(resolved.agent, context, hook);
-        const removeIntents = getRemoveIntent(context, hook);
-        const combined = [...hookIntents, ...removeIntents];
-
-        // ★ Yield: hook finalizado
-        yield { type: 'hook-done', hookType: hook.type, intents: combined };
-
-        newIntents.push(...combined);
-    }
-
-    await storage.addOrUpdateTask(context.task);
-    if (signal.aborted) return;
-
-    if (newIntents.length < 1) {
-        newIntents = await processHookPooling(context);
-        if (newIntents.length < 1) {
-            runningTasks.delete(ret.task.PK);
-            await storage.deletePooling(ret.task.PK);
-            yield { type: 'pooling-end', taskId: ret.task.PK };
+        if (!context.task?.iaCompressed) {
             yield { type: 'done' };
             return;
         }
+
+        runningTasks.add(ret.task.PK);
+
+        await storage.addPooling({
+            taskId: ret.task.PK,
+            userId: context.task?.owner ?? '',
+            startAt: Date.now().toString()
+        });
+
+        yield { type: 'pooling-start', taskId: ret.task.PK };
+
+        if (signal.aborted) return;
+
+        let _hooks = context.task.iaCompressed.queueFrontEnd || [];
+        const hooksToProcess = selectHooksToProcess(_hooks.filter(h => h.type !== 'pooling'));
+
+        let newIntents: mls.msg.AgentIntent[] = [];
+
+        for (const hook of hooksToProcess) {
+            // ★ Yield: hook iniciando
+            yield { type: 'hook-start', hookType: hook.type, stepId: hook.stepId };
+
+            const resolved = await resolveHookAgent(agent, context, hook);
+            if (!resolved.agent) {
+                const error = `[${agentName}](startNewAiTask) ${resolved.error || 'Invalid agent in hook step'}`;
+                const combined = getHookFailureIntents(context, hook, error);
+                yield { type: 'error', error, stepId: hook.stepId };
+                yield { type: 'hook-done', hookType: hook.type, intents: combined };
+                newIntents.push(...combined);
+                continue;
+            }
+
+            agent = resolved.agent;
+
+            const hookIntents = await processIntents2(resolved.agent, context, hook);
+            const removeIntents = getRemoveIntent(context, hook);
+            const combined = [...hookIntents, ...removeIntents];
+
+            // ★ Yield: hook finalizado
+            yield { type: 'hook-done', hookType: hook.type, intents: combined };
+
+            newIntents.push(...combined);
+        }
+
+        await storage.addOrUpdateTask(context.task);
+        if (signal.aborted) return;
+
+        if (newIntents.length < 1) {
+            newIntents = await processHookPooling(context);
+            if (newIntents.length < 1) {
+                runningTasks.delete(ret.task.PK);
+                await storage.deletePooling(ret.task.PK);
+                yield { type: 'pooling-end', taskId: ret.task.PK };
+                yield { type: 'done' };
+                return;
+            }
+        }
+
+        // ★ Yield: ciclo concluído, informando quantos intents restam
+        yield { type: 'cycle-done', remaining: newIntents.length };
+
+        // Keep this generator iterative instead of using recursive yield* delegation;
+        // recursion keeps every previous cycle on the async-generator stack and bloats error traces.
+        currentIntents = newIntents;
     }
-
-    // ★ Yield: ciclo concluído, informando quantos intents restam
-    yield { type: 'cycle-done', remaining: newIntents.length };
-
-    // Reentrada recursiva — continua emitindo eventos
-    yield* _processIntentsStream(agent, context, newIntents, signal);
 }
 
 function selectHooksToProcess(hooks: mls.msg.AgentHooks[]): mls.msg.AgentHooks[] {
