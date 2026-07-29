@@ -111,7 +111,7 @@ export const template_package = {
         },
         "author": "",
         "license": "ISC",
-        "dependencies": {
+        "actionDependencies": {
             "mls-102027": "git+https://github.com/expansiva/mls-102027.git"
         }
     }
