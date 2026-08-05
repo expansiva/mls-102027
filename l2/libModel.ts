@@ -27,9 +27,10 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
 
     if ((window as any).traceLivecicle) console.info('creating: files model ', project);
 
-    const deps = mls.l5.getProjectDependencies(project, false);
-    const projectWithDeps = [project, ...deps]
-
+    // const deps = mls.l5.getProjectDependencies(project, false);
+    // const projectWithDeps = [project, ...deps]
+    const projectWithDeps = [project];
+    
     for (const key of keys) {
         const storFile = mls.stor.files[key];
         if (projectWithDeps.includes(storFile.project)
