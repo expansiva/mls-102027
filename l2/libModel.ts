@@ -23,6 +23,8 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
     projectsLoaded.push(project);
 
     const promises: Promise<mls.editor.IModels | mls.editor.IModelBase | undefined>[] = [];
+    const promisesProject: Promise<mls.editor.IModels | mls.editor.IModelBase | undefined>[] = [];
+
     const keys: string[] = Object.keys(mls.stor.files);
 
     if ((window as any).traceLivecicle) console.info('creating: files model ', project);
@@ -30,7 +32,7 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
     // const deps = mls.l5.getProjectDependencies(project, false);
     // const projectWithDeps = [project, ...deps]
     const projectWithDeps = [project];
-    
+
     for (const key of keys) {
         const storFile = mls.stor.files[key];
         if (projectWithDeps.includes(storFile.project)
@@ -47,21 +49,22 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
 
     const info = await mls.stor.localDB.readPrjInfo(baseProject);
     if (info && info.indexModules && info.indexModules !== '') {
-        promises.push(_createProjectModel(baseProject, info.indexModules));
+        promisesProject.push(_createProjectModel(baseProject, info.indexModules));
     }
 
     const prj = mls.actualProject;
     if (prj && prj !== baseProject && prj !== mls.stor.LOCALPROJECTNUMBER) {
         const actual = await mls.stor.localDB.readPrjInfo(prj);
         if (actual && actual.indexModules && actual.indexModules !== '') {
-            promises.push(_createProjectModel(prj, actual.indexModules));
+            promisesProject.push(_createProjectModel(prj, actual.indexModules));
         }
     }
 
     if (mls.istrace) console.time('creating models');
+    await Promise.all(promisesProject);
     await Promise.all(promises);
     if (mls.istrace) console.timeEnd('creating models');
-
+    
 }
 
 export async function readProjectTypescriptAndCompileL1(project: number, shortName: string, needCompile: boolean = true) {
