@@ -29,9 +29,8 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
 
     if ((window as any).traceLivecicle) console.info('creating: files model ', project);
 
-    // const deps = mls.l5.getProjectDependencies(project, false);
-    // const projectWithDeps = [project, ...deps]
-    const projectWithDeps = [project];
+    const deps = mls.l5.getProjectDependencies(project, false);
+    const projectWithDeps = [project, ...deps]
 
     for (const key of keys) {
         const storFile = mls.stor.files[key];
@@ -64,7 +63,7 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
     await Promise.all(promisesProject);
     await Promise.all(promises);
     if (mls.istrace) console.timeEnd('creating models');
-    
+
 }
 
 export async function readProjectTypescriptAndCompileL1(project: number, shortName: string, needCompile: boolean = true) {
