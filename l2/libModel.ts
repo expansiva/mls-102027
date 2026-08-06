@@ -37,7 +37,7 @@ export async function readProjectTypescriptAndCompile(project: number, shortName
         if (projectWithDeps.includes(storFile.project)
             && storFile.level === 2
             && storFile.extension === '.ts'
-            && (mls.istrace || storFile.inLocalStorage)
+            && storFile.inLocalStorage
             && storFile.shortName !== shortName) {
             // createStorIfNeed=false: loading a project must never materialize
             // missing .less/.html/.test.ts/.defs.ts stor files.
