@@ -14,6 +14,16 @@ jobs:
       PROJECT: ${{ github.event.repository.name }}
 
     steps:
+      - name: Check resources
+        run: |
+          echo "=== CPU ==="
+          nproc
+      
+          echo "=== RAM ==="
+          free -h
+      
+          echo "=== DISK ==="
+          df -h /
       - name: Checkout mls-base
         uses: actions/checkout@v4
         with:
