@@ -9,10 +9,10 @@ ai-agent-default-feedback-102027 {
 
     .feedback-section {
         a {
-            color: @active-color;
+            color: @link-text;
 
             &:hover {
-                color: @active-color-hover;
+                color: @link-text-hover;
             }
         }
 
@@ -46,12 +46,12 @@ ai-agent-default-feedback-102027 {
             }
 
             .success {
-                fill: @success-color;
+                fill: @status-success-text;
             }
 
             .error {
-                fill: @error-color;
-                color: @error-color;
+                fill: @status-error-text;
+                color: @status-error-text;
             }
 
             .waiting {
@@ -136,18 +136,18 @@ ai-agent-default-feedback-102027 {
     .fill {
         height: 100%;
         width: 0%;
-        background: linear-gradient(90deg, @info-color, @success-color);
+        background: linear-gradient(90deg, @button-primary-bg, @status-success-text);
         transition: width 350ms ease;
         position: relative;
     }
 
     .fill.done {
-        background: @success-color;
+        background: @status-success-text;
     }
 
     /* falha */
     .fill.failed {
-        background: @error-color
+        background: @status-error-text
     }
 
     .fill:not(.failed):not(.done)::after {
@@ -188,12 +188,12 @@ ai-agent-default-feedback-102027 {
         }
 
         .success {
-            fill: @success-color;
+            fill: @status-success-text;
         }
 
         .error {
-            fill: @error-color;
-            color: @error-color;
+            fill: @status-error-text;
+            color: @status-error-text;
         }
 
     }
