@@ -683,6 +683,7 @@ async function _updateModelStatusAny(modelBase: mls.editor.IModelStyle, changed:
 async function _updateModelStatusTS(modelBase: mls.editor.IModelTS, changed: boolean): Promise<void> {
 
     if (!modelBase.storFile) throw new Error('Invalid stor file');
+    if (modelBase.model.isDisposed()) return;
     const { project, shortName, folder, level } = modelBase.storFile;
 
     if (project === 0 && (shortName === 'loading' || shortName === 'testFile')) return;
@@ -691,6 +692,7 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelTS, changed: boo
 
 
     const ok = await mls.l2.typescript.compileAndPostProcess(modelBase, true, level === 2);
+    if (modelBase.model.isDisposed()) return;
 
     let hasError = ok === false && (modelBase.compilerResults && modelBase.compilerResults.errors.length > 0);
 
@@ -717,6 +719,7 @@ async function _updateModelStatusTS(modelBase: mls.editor.IModelTS, changed: boo
 async function _changeStatusFile(modelBase: mls.editor.IModelBase, storFile: mls.stor.IFileInfo, variables: mls.common.tripleslash.ITripleSlashVariables | undefined, hasError: boolean, changed: boolean): Promise<void> {
 
     if (!storFile) return; // new file dont have storFile ???
+    if (modelBase.model.isDisposed()) return;
     const position: 'left' | 'right' | 'all' = _getPosition(modelBase.model.id, mapExt[storFile.extension]);
 
     storFile.hasError = hasError;
@@ -753,6 +756,7 @@ function _getPosition(modeIld: string, tp: 'ts' | 'html' | 'defs' | 'style' | 't
 }
 
 async function _checkSameContent(modelBase: mls.editor.IModelBase, storFile: mls.stor.IFileInfo) {
+    if (modelBase.model.isDisposed()) return;
 
     let sameContent: boolean = modelBase.originalCRC === mls.common.crc.crc32(modelBase.model.getValue()).toString(16);
 
