@@ -1,7 +1,6 @@
 /// <mls fileReference="_102027_/l2/libStor.ts" enhancement="_blank"/>
 
 import { convertFileNameToTag } from '/_102027_/l2/utils.js';
-import { createModel, createAllModels } from '/_102027_/l2/libModel.js'
 import { getBaseTemplate, verifyNeedAddTripleslach, isStorContentEqualTemplateDefault } from '/_102027_/l2/libCommom.js';
 
 
@@ -39,7 +38,10 @@ export async function createStorFile(req: IReqCreateStorFile, needCreateModel: b
 
     await mls.stor.localStor.setContent(file, fileInfo);
 
-    if (needCreateModel && ['.ts', '.html', '.defs.ts', '.test.ts'].includes(file.extension)) await createModel(file, needCompile, awaitCompile);
+    if (needCreateModel && ['.ts', '.html', '.defs.ts', '.test.ts'].includes(file.extension)) {
+        const { createModel } = await import('/_102027_/l2/libModel.js');
+        await createModel(file, needCompile, awaitCompile);
+    }
 
     // file.getModel = async () => _getModel(file);
 
@@ -86,7 +88,10 @@ export async function createAllFiles(req: IReqCreateAllFiles, needCreateModel: b
     ret.test = await safeCreate({ ...param, extension: '.test.ts', source: newTestSource }, false);
     ret.def = await safeCreate({ ...param, extension: '.defs.ts', source: newDefsSource }, false);
 
-    if (needCreateModel && ret.ts && !(ret.ts instanceof Error)) await createAllModels(ret.ts, true, awaitCompile);
+    if (needCreateModel && ret.ts && !(ret.ts instanceof Error)) {
+        const { createAllModels } = await import('/_102027_/l2/libModel.js');
+        await createAllModels(ret.ts, true, awaitCompile);
+    }
 
     return ret;
 
@@ -311,6 +316,7 @@ export async function undoAllFiles(storFile: mls.stor.IFileInfo): Promise<void> 
     }
 
     await mls.stor.localDB.removePrjInfo(storFile.project);
+    const { createAllModels } = await import('/_102027_/l2/libModel.js');
     createAllModels(storFile, true, false, false)
 }
 

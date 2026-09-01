@@ -13,9 +13,33 @@ import {
 } from "/_102027_/l2/aiAgentHelper.js";
 
 import { IAgent, IAgentAsync } from '/_102027_/l2/aiAgentBase.js';
-import * as storage from '/_102036_/l2/collabMessagesIndexedDB.js';
+import * as idbStorage from '/_102036_/l2/collabMessagesIndexedDB.js';
 
 const agentName = 'aiAgentOrchestration';
+
+/** Browser keeps IndexedDB. CLI calls setOrchestrationStorage before loadAgent/pooling. */
+export type OrchestrationStorage = {
+    addOrUpdateTask(task: mls.msg.TaskData): Promise<void>;
+    getTask(taskId: string): Promise<mls.msg.TaskData | undefined>;
+    getMessage(messageId: string): Promise<mls.msg.Message | undefined>;
+    addPooling(pooling: { taskId: string; userId: string; startAt: string }): Promise<void>;
+    deletePooling(taskId: string): Promise<void>;
+    updateThreadPendingTasks(threadId: string, taskId?: string): Promise<unknown>;
+};
+
+let orchestrationStorage: OrchestrationStorage = idbStorage;
+
+export function setOrchestrationStorage(next: OrchestrationStorage | null): void {
+    orchestrationStorage = next ?? idbStorage;
+}
+
+type ApplyIntentsFn = typeof msgApplyIntents;
+let applyIntentsImpl: ApplyIntentsFn = msgApplyIntents;
+
+/** CLI injects Bearer POST /msg. Browser never calls this. */
+export function setApplyIntents(fn: ApplyIntentsFn | null): void {
+    applyIntentsImpl = fn ?? msgApplyIntents;
+}
 
 // ── Event types ──────────────────────────────────────────────────
 
@@ -30,6 +54,32 @@ export type OrchestrationEvent =
     | { type: 'error'; error: string; stepId?: number }
     | { type: 'done' };
 
+type OrchestrationListener = (event: OrchestrationEvent) => void;
+const orchestrationListeners = new Set<OrchestrationListener>();
+
+/** CLI / tests. Browser never subscribes — executeBeforePrompt still swallows the stream. */
+export function subscribeOrchestrationEvents(listener: OrchestrationListener): () => void {
+    orchestrationListeners.add(listener);
+    return () => { orchestrationListeners.delete(listener); };
+}
+
+function emitOrchestrationEvent(event: OrchestrationEvent): void {
+    for (const listener of orchestrationListeners) {
+        try { listener(event); } catch (err) {
+            console.error('[aiAgentOrchestration] listener error', err);
+        }
+    }
+}
+
+async function* withOrchestrationEvents(
+    gen: AsyncGenerator<OrchestrationEvent, void, unknown>,
+): AsyncGenerator<OrchestrationEvent, void, unknown> {
+    for await (const event of gen) {
+        emitOrchestrationEvent(event);
+        yield event;
+    }
+}
+
 // ── executeBeforePrompt (streaming version) ──────────────────────
 
 export async function* executeBeforePromptStream(
@@ -39,7 +89,9 @@ export async function* executeBeforePromptStream(
 
     if ((agent as IAgent).beforePrompt) {
         await (agent as IAgent).beforePrompt(context);
-        yield { type: 'done' };
+        const done: OrchestrationEvent = { type: 'done' };
+        emitOrchestrationEvent(done);
+        yield done;
         return;
     }
 
@@ -66,7 +118,7 @@ export async function* executeBeforePromptStream(
 
     if (!intents) throw new Error(`Invalid agent ${asyncAgent.agentName}, no beforePrompt`);
 
-    yield* processIntentsStream(asyncAgent, context, intents);
+    yield* withOrchestrationEvents(processIntentsStream(asyncAgent, context, intents));
 }
 
 /**
@@ -140,7 +192,7 @@ async function* _processIntentsStream(
         const oldContextCreateAt = context.message.createAt;
         const isAddMessageAI = currentIntents.some(i => i.type === 'add-message-ai');
 
-        const value = await msgApplyIntents({
+        const value = await applyIntentsImpl({
             userId: context.message.senderId,
             intents: currentIntents
         });
@@ -156,7 +208,7 @@ async function* _processIntentsStream(
         // and resolve via storage.getTask (e.g. getAgentContext). Notifying before
         // the store is updated makes them read a stale task — which left the second
         // clarification stuck on "Processing..." until a manual task click.
-        await storage.addOrUpdateTask(ret.task);
+        await orchestrationStorage.addOrUpdateTask(ret.task);
         notifyTaskChange(context, isAddMessageAI ? oldContextCreateAt : undefined);
 
         // ★ Yield: task criada / intents aplicados
@@ -179,7 +231,7 @@ async function* _processIntentsStream(
 
         runningTasks.add(ret.task.PK);
 
-        await storage.addPooling({
+        await orchestrationStorage.addPooling({
             taskId: ret.task.PK,
             userId: context.task?.owner ?? '',
             startAt: Date.now().toString()
@@ -220,14 +272,14 @@ async function* _processIntentsStream(
             newIntents.push(...combined);
         }
 
-        await storage.addOrUpdateTask(context.task);
+        await orchestrationStorage.addOrUpdateTask(context.task);
         if (signal.aborted) return;
 
         if (newIntents.length < 1) {
             newIntents = await processHookPooling(context);
             if (newIntents.length < 1) {
                 runningTasks.delete(ret.task.PK);
-                await storage.deletePooling(ret.task.PK);
+                await orchestrationStorage.deletePooling(ret.task.PK);
                 yield { type: 'pooling-end', taskId: ret.task.PK };
                 yield { type: 'done' };
                 return;
@@ -453,7 +505,7 @@ async function processHookPooling(context: mls.msg.ExecutionContext): Promise<ml
         if (inClarification) {
             const threadId = context.message.threadId;
             const taskId = context.task.PK;
-            const thread = await storage.updateThreadPendingTasks(threadId, taskId);
+            const thread = await orchestrationStorage.updateThreadPendingTasks(threadId, taskId);
             notifyThreadChange(thread);
         }
     }
@@ -480,7 +532,7 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
     }
 
     if (task.status !== 'in progress') {
-        storage.deletePooling(taskId);
+        void orchestrationStorage.deletePooling(taskId);
         return;
     }
 
@@ -495,7 +547,8 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
     if (!agent) throw new Error(`[${agentNameLocal}] createAgent function not found`);
 
     runningTasks.add(taskId);
-    await storage.addPooling({
+    emitOrchestrationEvent({ type: 'pooling-start', taskId });
+    await orchestrationStorage.addPooling({
         taskId,
         userId: context.task?.owner ?? '',
         startAt: Date.now().toString()
@@ -522,19 +575,22 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
         )
     ).flat();
 
-    await storage.addOrUpdateTask(task);
+    await orchestrationStorage.addOrUpdateTask(task);
     let intents = intentsFromHooks;
 
     if (intents.length === 0) {
         intents = await processHookPooling(context);
         if (intents.length === 0) {
             runningTasks.delete(taskId);
-            await storage.deletePooling(taskId);
+            await orchestrationStorage.deletePooling(taskId);
+            emitOrchestrationEvent({ type: 'pooling-end', taskId });
             return;
         }
     }
 
-    void processIntents(agent, context, intents);
+    void processIntents(agent, context, intents).finally(() => {
+        emitOrchestrationEvent({ type: 'pooling-end', taskId });
+    });
 }
 
 // ── pauseOrContinueTask ─────────────────────────────────────────
@@ -660,7 +716,7 @@ export async function finishClarification(
     action: "continue" | "cancel"): Promise<void> {
 
     if (context.task) {
-        const thread = await storage.updateThreadPendingTasks(context.message.threadId, context.task.PK);
+        const thread = await orchestrationStorage.updateThreadPendingTasks(context.message.threadId, context.task.PK);
         notifyThreadChange(thread);
     }
 
@@ -740,7 +796,7 @@ export async function getAgentContext(taskId: string): Promise<{
     interaction: mls.msg.AIAgentStep,
     step: mls.msg.AIPayload
 }> {
-    const task: mls.msg.TaskData | undefined = await storage.getTask(taskId);
+    const task: mls.msg.TaskData | undefined = await orchestrationStorage.getTask(taskId);
     if (!task || !task.messageid_created) throw new Error(`[${agentName}](getAgentContext) Invalid taskId ${taskId}`);
     let step: mls.msg.AIPayload | null = getNextPendentStep(task);
     if (!step || (step.type !== "clarification" && step.type !== "tool")) {
@@ -756,7 +812,7 @@ export async function getAgentContext(taskId: string): Promise<{
 
     const messageId: string = task.messageid_created;
 
-    const message: mls.msg.Message | undefined = await storage.getMessage(messageId);
+    const message: mls.msg.Message | undefined = await orchestrationStorage.getMessage(messageId);
     if (!message) throw new Error(`[${agentName}](getAgentContext) Message not found: ${messageId}`)
     const context: mls.msg.ExecutionContext = {
         message,
