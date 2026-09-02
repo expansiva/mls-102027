@@ -24,7 +24,12 @@ export type OrchestrationStorage = {
     getMessage(messageId: string): Promise<mls.msg.Message | undefined>;
     addPooling(pooling: { taskId: string; userId: string; startAt: string }): Promise<void>;
     deletePooling(taskId: string): Promise<void>;
-    updateThreadPendingTasks(threadId: string, taskId?: string): Promise<unknown>;
+    /**
+     * The browser (IndexedDB) returns the updated thread; a host with no thread cache returns
+     * nothing. Declared as the type the consumer actually needs — `unknown` compiled here and
+     * broke at the two call sites that hand the result to `notifyThreadChange`.
+     */
+    updateThreadPendingTasks(threadId: string, taskId?: string): Promise<mls.msg.Thread | undefined>;
 };
 
 let orchestrationStorage: OrchestrationStorage = idbStorage;
@@ -506,7 +511,7 @@ async function processHookPooling(context: mls.msg.ExecutionContext): Promise<ml
             const threadId = context.message.threadId;
             const taskId = context.task.PK;
             const thread = await orchestrationStorage.updateThreadPendingTasks(threadId, taskId);
-            notifyThreadChange(thread);
+            if (thread) notifyThreadChange(thread);
         }
     }
 
@@ -717,7 +722,7 @@ export async function finishClarification(
 
     if (context.task) {
         const thread = await orchestrationStorage.updateThreadPendingTasks(context.message.threadId, context.task.PK);
-        notifyThreadChange(thread);
+        if (thread) notifyThreadChange(thread);
     }
 
     if (action === 'cancel') {
@@ -904,7 +909,10 @@ export async function getInstanceByName(
             // versionRef so the browser can cache them and only re-fetch when the
             // version actually changes.
             const cacheKey = file.inLocalStorage ? Date.now() : encodeURIComponent(file.versionRef);
-            const module = await import(`/_${file.project}_/l2/${file.folder ? file.folder.trim() + '/' : ''}${file.shortName}?t=${cacheKey}`)
+            const path = `/_${file.project}_/l2/${file.folder ? file.folder.trim() + '/' : ''}${file.shortName}`;
+            // Browser keeps ?t= cache-bust. Deno import maps reject the query string.
+            const spec = "Deno" in globalThis ? path : `${path}?t=${cacheKey}`;
+            const module = await import(spec)
             const factoryName = FACTORY_MAP[mode];
             const factory = module[factoryName];
 

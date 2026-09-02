@@ -179,75 +179,45 @@ export const getTemporaryContext = (threadId: string, userId: string, prompt: st
   return context;
 };
 
+/** Browser: window.top ?? window. CLI/Deno: no-op (no window). */
+function collabScopeWindow(): Window | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.top ? window.top : window;
+}
+
+function dispatchCollabEvent(name: string, detail: unknown): void {
+  const scopeWindow = collabScopeWindow();
+  if (!scopeWindow) return;
+  scopeWindow.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+}
+
 export function notifyMessageSendChange(context: mls.msg.ExecutionContext): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('message-send', {
-    detail: { context },
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('message-send', { context });
 }
 
 export function notifyTaskChange(context: mls.msg.ExecutionContext, oldContextCreateAt?: string): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('task-change', {
-    detail: { context, oldContextCreateAt },
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('task-change', { context, oldContextCreateAt });
 }
 
 export function notifyTaskCompleted(context: mls.msg.ExecutionContext, result?: string): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('task-completed', {
-    detail: { context, result },
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('task-completed', { context, result });
 }
 
 export function notifyThreadChange(thread: mls.msg.Thread): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('thread-change', {
-    detail: thread,
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('thread-change', thread);
 }
 
 export function notifyMessageChange( message: mls.msg.Message): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('message-change', {
-    detail: message,
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('message-change', message);
 }
 
 
 export function notifyThreadCreate(thread: mls.msg.Thread): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('thread-create', {
-    detail: thread,
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('thread-create', thread);
 }
 
 export function dispatchDetailsTaskClose(taskId: string): void {
-  const scopeWindow = window?.top ? window.top : window;
-  const event = new CustomEvent('task-details-close', {
-    detail: taskId,
-    bubbles: true,
-    composed: true
-  });
-  scopeWindow.dispatchEvent(event);
+  dispatchCollabEvent('task-details-close', taskId);
 }
 
 

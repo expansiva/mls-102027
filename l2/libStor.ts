@@ -1,7 +1,6 @@
 /// <mls fileReference="_102027_/l2/libStor.ts" enhancement="_blank"/>
 
 import { convertFileNameToTag } from '/_102027_/l2/utils.js';
-import { getBaseTemplate, verifyNeedAddTripleslach, isStorContentEqualTemplateDefault } from '/_102027_/l2/libCommom.js';
 
 
 export async function createStorFile(req: IReqCreateStorFile, needCreateModel: boolean, needCompile: boolean = true, awaitCompile: boolean = false): Promise<mls.stor.IFileInfo> {
@@ -23,6 +22,7 @@ export async function createStorFile(req: IReqCreateStorFile, needCreateModel: b
 
     let source = req.source;
     if (req.level === 2) {
+        const { verifyNeedAddTripleslach } = await import('/_102027_/l2/libCommom.js');
         source = verifyNeedAddTripleslach(params, req.source, req.extension)
     }
     const fileInfo: mls.stor.IFileInfoValue = {
@@ -52,6 +52,7 @@ export async function createStorFile(req: IReqCreateStorFile, needCreateModel: b
 export async function createAllFiles(req: IReqCreateAllFiles, needCreateModel: boolean = true, awaitCompile: boolean = false): Promise<IRetAllFiles> {
 
     const { folder, shortName, project } = req;
+    const { getBaseTemplate } = await import('/_102027_/l2/libCommom.js');
 
     const template = await getBaseTemplate({ folder, shortName, project, extension: '.ts' }, req.enhancement);
 
@@ -104,7 +105,6 @@ export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
         return;
     }
 
-    storFile.status = 'deleted';
     const keyToModel = mls.editor.getKeyModel(storFile.project, storFile.shortName, storFile.folder, storFile.level);
 
     if (storFile.getValueInfo) {
@@ -121,6 +121,9 @@ export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
         }
         await mls.stor.localStor.setContent(storFile, valueInfo);
     }
+    // Host setContent promotes status to `changed`. Mark deleted after the trash write so the
+    // in-memory object stays deleted (getFileModified treats deleted as absent).
+    storFile.status = 'deleted';
 
 }
 
@@ -146,6 +149,8 @@ export async function removeNewStorFilesWithTemplateDefault(): Promise<mls.stor.
 
     // snapshot: deleteFile remove entradas de mls.stor.files durante o loop
     const files = Object.values(mls.stor.files).filter((f) => f && f.project === project && f.status === 'new');
+
+    const { isStorContentEqualTemplateDefault } = await import('/_102027_/l2/libCommom.js');
 
     for await (const storFile of files) {
 
