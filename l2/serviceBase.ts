@@ -3,6 +3,7 @@
 import { StateLitElement } from '/_102029_/l2/stateLitElement.js';
 import { customElement, property, state } from 'lit/decorators.js';
 import * as libCommom from '/_102027_/l2/libCommom.js'; 
+import { applyMsizeHeight } from '/_102027_/l2/msizeHeight.js';
 
 @customElement('service-base-102027')
 export abstract class ServiceBase extends StateLitElement {
@@ -130,9 +131,7 @@ export abstract class ServiceBase extends StateLitElement {
         }
 
         if (name === 'msize') {
-            const [width, height, top, left] = this.msize.split(',');
-            if (height) this.style.height = height + 'px';
-            this.style.overflow = 'auto';
+            applyMsizeHeight(this, newVal);
         }
 
         super.attributeChangedCallback(name, oldVal, newVal);
