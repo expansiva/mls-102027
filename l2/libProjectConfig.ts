@@ -48,29 +48,39 @@ export async function getConfigProject(project: number, ignoreLocalChanges = fal
     return projectConfig[project].config;
 }
 
-export async function updateConfigProject(project: number, newConfig: mls.l5_common.ProjectConfig): Promise<void> {
+async function saveProjectConfigFile(project: number, content: string): Promise<void> {
+    const { saveL5File } = await import('/_102033_/l2/cbe/l5Save.js');
+    await saveL5File(project, FILENAME, content, 'save l5/project.json');
+}
+
+export async function updateConfigProject(project: number, newConfig: mls.l5_common.ProjectConfig, save = false): Promise<void> {
     const key = mls.stor.getKeyToFiles(project, LEVEL, FILENAME, '', EXTENSION);
-    projectConfig[project].config = newConfig;
     const configFile = mls.stor.files[key];
-    if (!configFile) throw new Error('No config file!');
+    if (!configFile || !projectConfig[project]) throw new Error('No config file!');
+    projectConfig[project].config = newConfig;
+    const content = JSON.stringify(newConfig, null, 2);
     await mls.stor.localStor.setContent(configFile, {
         contentType: 'string',
-        content: JSON.stringify(newConfig, null, 2)
+        content
     });
+    if (save) await saveProjectConfigFile(project, content);
 }
 
 export async function updateConfigProjectPlugins(
     project: number,
-    newPlugins: { [key: string]: mls.l5_common.IPlugin; }
+    newPlugins: { [key: string]: mls.l5_common.IPlugin; },
+    save = false,
 ): Promise<void> {
     const key = mls.stor.getKeyToFiles(project, LEVEL, FILENAME, '', EXTENSION);
-    projectConfig[project].config.plugins = newPlugins;
     const configFile = mls.stor.files[key];
-    if (!configFile) throw new Error('No config file!');
+    if (!configFile || !projectConfig[project]) throw new Error('No config file!');
+    projectConfig[project].config.plugins = newPlugins;
+    const content = JSON.stringify(projectConfig[project].config, null, 2);
     await mls.stor.localStor.setContent(configFile, {
         contentType: 'string',
-        content: JSON.stringify(projectConfig[project].config, null, 2)
+        content
     });
+    if (save) await saveProjectConfigFile(project, content);
 }
 
 
