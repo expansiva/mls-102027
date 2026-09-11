@@ -70,6 +70,9 @@ function storStub(opts: { withFile?: boolean } = {}): { stor: unknown; calls: Ca
       setContent: async (...args: unknown[]) => {
         calls.push({ name: 'cache.setContent', args });
       },
+      clearProjectsCache: async (...args: unknown[]) => {
+        calls.push({ name: 'cache.clearProjectsCache', args });
+      },
     },
   };
   return { stor, calls };
