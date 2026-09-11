@@ -108,6 +108,45 @@ function editorStub() {
   return { models: {}, getKeyModel: () => 'k' };
 }
 
+void test('deleteFile uses localStor.deleteFile when the host exposes the capability', async () => {
+  const file = stubFile('changed');
+  let unlinked = 0;
+  let trash = 0;
+  await withMls({
+    editor: editorStub(),
+    common: { crc: { crc32: () => 0 } },
+    stor: {
+      files: {},
+      getKeyToFiles: () => 'k',
+      localStor: {
+        deleteFile: async () => { unlinked += 1; },
+        setContent: async () => { trash += 1; },
+      },
+    },
+  }, () => deleteFile(file));
+  assert.equal(unlinked, 1);
+  assert.equal(trash, 0);
+  assert.equal(file.status, 'changed');
+});
+
+void test('deleteFile without the capability keeps the Studio trash path', async () => {
+  const file = stubFile('changed');
+  let trash = 0;
+  await withMls({
+    editor: editorStub(),
+    common: { crc: { crc32: () => 0 } },
+    stor: {
+      files: {},
+      getKeyToFiles: () => 'k',
+      localStor: {
+        setContent: async () => { trash += 1; },
+      },
+    },
+  }, () => deleteFile(file));
+  assert.equal(trash, 1);
+  assert.equal(file.status, 'deleted');
+});
+
 void test('deleteFile marks deleted after setContent even when the host write promotes to changed', async () => {
   const file = stubFile('changed');
   await withMls({

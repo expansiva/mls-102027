@@ -98,7 +98,20 @@ export async function createAllFiles(req: IReqCreateAllFiles, needCreateModel: b
 
 }
 
+type HostUnlink = (file: mls.stor.IFileInfo) => unknown;
+
+function hostUnlink(): HostUnlink | undefined {
+    const fn = (mls.stor.localStor as { deleteFile?: unknown }).deleteFile;
+    return typeof fn === 'function' ? fn as HostUnlink : undefined;
+}
+
 export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
+
+    const unlink = hostUnlink();
+    if (unlink) {
+        await unlink(storFile);
+        return;
+    }
 
     if (storFile.status === 'new') {
         await deleteFileSystem(storFile);
