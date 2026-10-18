@@ -110,6 +110,10 @@ export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
     const unlink = hostUnlink();
     if (unlink) {
         await unlink(storFile);
+        if (storFile.status === 'deleted') {
+            mls.events.fireFileAction('statusOrErrorChanged', storFile, 'left', 0);
+            mls.events.fireFileAction('statusOrErrorChanged', storFile, 'right', 0);
+        }
         return;
     }
 
@@ -137,6 +141,8 @@ export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
     // Host setContent promotes status to `changed`. Mark deleted after the trash write so the
     // in-memory object stays deleted (getFileModified treats deleted as absent).
     storFile.status = 'deleted';
+    mls.events.fireFileAction('statusOrErrorChanged', storFile, 'left', 0);
+    mls.events.fireFileAction('statusOrErrorChanged', storFile, 'right', 0);
 
 }
 
