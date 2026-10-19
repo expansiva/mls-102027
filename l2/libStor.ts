@@ -212,6 +212,8 @@ export async function renameFile(storFile: mls.stor.IFileInfo, newProject: numbe
     const needCreateModels = param.level === 2;
     const file = await createStorFile(param, needCreateModels, needCompile);
     await deleteFileSystem(storFile);
+    mls.events.fireFileAction('statusOrErrorChanged', file, 'left', 0);
+    mls.events.fireFileAction('statusOrErrorChanged', file, 'right', 0);
 
     return file;
 }
