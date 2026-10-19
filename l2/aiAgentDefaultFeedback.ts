@@ -26,14 +26,7 @@ export class AiAgentDefaultFeedback102027 extends StateLitElement {
         }
     }
 
-    private getTitle(
-        step:
-            | mls.msg.AIAgentStep
-            | mls.msg.AIToolStep
-            | mls.msg.AIClarificationStep
-            | mls.msg.AIResultStep
-            | mls.msg.AIFlexibleResultStep
-    ): string {
+    private getTitle(step: mls.msg.AIPayload): string {
         return (
             step.stepTitle ||
             (step as mls.msg.AIAgentStep).agentName ||
