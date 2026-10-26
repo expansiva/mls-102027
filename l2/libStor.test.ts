@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deleteFile } from '/_102027_/l2/libStor.js';
+import { deleteFile, undoFile } from '/_102027_/l2/libStor.js';
+import { draftPublishedCommit, rememberDraftMain } from '/_102033_/l2/cbe/studioDraftFiles.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(HERE, 'libStor.ts');
@@ -210,4 +211,161 @@ void test('deleteFile assigns deleted after the trash setContent, not before', (
   const deletedAt = body.lastIndexOf("status = 'deleted'");
   assert.ok(setContentAt > 0, 'deleteFile must call setContent for the trash write');
   assert.ok(deletedAt > setContentAt, 'status=deleted must be assigned after setContent so a host write cannot promote it back to changed');
+});
+
+interface UndoCall {
+  name: string;
+  status?: string;
+  content?: unknown;
+  ref?: string;
+  shortName?: string;
+}
+
+function fileKeyOf(file: { project: number; level: number; folder: string; shortName: string; extension: string }): string {
+  return [file.project, file.level, file.folder, file.shortName, file.extension].join('|');
+}
+
+function undoHarness(status: string, shortName = 'x', history: (ref: string) => Promise<string | null> = async () => 'PUBLISHED') {
+  const file = stubFile(status, { shortName });
+  const calls: UndoCall[] = [];
+  const model = {
+    setValue: (value: string) => { calls.push({ name: 'setValue', content: value }); },
+    dispose: () => { calls.push({ name: 'dispose' }); },
+  };
+  const files: Record<string, mls.stor.IFileInfo> = {};
+  files[fileKeyOf(file)] = file;
+  const mlsStub = {
+    editor: {
+      models: { [shortName]: { ts: { model, originalCRC: 'old' } } } as Record<string, { ts?: { model: { setValue: (value: string) => void; dispose: () => void }; originalCRC?: string } }>,
+      getKeyModel: (_project: number, name: string) => name,
+    },
+    common: { crc: { crc32: (src: string) => src.length } },
+    stor: {
+      files,
+      getKeyToFiles: (project: number, level: number, name: string, folder: string, extension: string) =>
+        [project, level, folder, name, extension].join('|'),
+      localStor: {
+        setContent: async (target: { status?: string }, value: { content?: unknown }) => {
+          calls.push({ name: 'setContent', status: target.status, content: value.content });
+        },
+      },
+      localDB: {
+        getContentInfoOrNull: async () => ({
+          content: 'local',
+          contentType: 'string' as const,
+          originalProject: 1,
+          originalShortName: 'old',
+          originalFolder: 'mod',
+        }),
+        removePrjInfo: async () => { calls.push({ name: 'removePrj' }); },
+      },
+      setContents: async (list: { status?: string; shortName?: string }[]) => {
+        for (const item of list) calls.push({ name: 'setContents', status: item.status, shortName: item.shortName });
+        return list.map(() => ({ project: 1, result: true }));
+      },
+      addOrUpdateFile: async (params: { project: number; level: number; shortName: string; folder: string; extension: string }) => {
+        const created = stubFile('nochange', params);
+        files[fileKeyOf(created)] = created;
+        calls.push({ name: 'add', shortName: params.shortName });
+        return created;
+      },
+      others: {
+        getDefaultDriver: async () => ({
+          driverVersion: '1.0.0-vm',
+          getHistoryContent: async (info: { shortName: string }, ref: string) => {
+            calls.push({ name: 'history', shortName: info.shortName, ref });
+            return history(ref);
+          },
+        }),
+      },
+    },
+  };
+  return { file, calls, mlsStub, files };
+}
+
+void test('undoFile restores the published version for the four draft statuses and keeps the old path without a cookie', async () => {
+  const screen: string[] = [];
+  const errors: string[] = [];
+  const g = globalThis as { collabMessages?: { add: (msg: string, type: string) => void } };
+  const previousScreen = g.collabMessages;
+  const previousError = console.error;
+  const previousCookie = document.cookie;
+  g.collabMessages = { add: (msg) => { screen.push(msg); } };
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
+  try {
+    assert.equal(draftPublishedCommit(), undefined);
+
+    for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
+      const shortName = status === 'renamed' ? 'next' : 'x';
+      const { file, calls, mlsStub, files } = undoHarness(status, shortName);
+      await withMls(mlsStub, () => undoFile(file));
+      assert.equal(calls.some((call) => call.name === 'history' || call.name === 'setContents'), false, status);
+      if (status === 'changed' || status === 'deleted') {
+        assert.equal(file.status, 'nochange');
+        assert.equal(calls.some((call) => call.name === 'dispose'), true, status);
+        assert.equal(calls.some((call) => call.name === 'setValue'), false, status);
+      }
+      if (status === 'new') assert.equal(fileKeyOf(file) in files, false);
+      if (status === 'renamed') {
+        assert.equal(fileKeyOf({ project: 1, level: 1, folder: 'mod', shortName: 'old', extension: '.ts' }) in files, true);
+        assert.equal(fileKeyOf(file) in files, false);
+        assert.equal(calls.some((call) => call.name === 'dispose'), false);
+      }
+    }
+
+    const github = undoHarness('changed');
+    github.mlsStub.stor.others.getDefaultDriver = async () => ({ driverVersion: '4.2.0', getHistoryContent: async () => 'PUBLISHED' });
+    document.cookie = 'collab-draft=team-1';
+    await withMls(github.mlsStub, () => undoFile(github.file));
+    assert.equal(github.calls.some((call) => call.name === 'history'), false);
+    assert.equal(github.calls.some((call) => call.name === 'dispose'), true);
+    assert.equal(github.file.status, 'nochange');
+
+    const missing = undoHarness('changed');
+    await withMls(missing.mlsStub, () => undoFile(missing.file));
+    assert.equal(missing.file.status, 'changed');
+    assert.equal(missing.calls.some((call) => call.name === 'history'), false);
+    assert.equal(screen.some((msg) => msg === 'The published commit is unknown, so the file stays as it is.'), true);
+
+    const unread = undoHarness('changed', 'x', async () => null);
+    rememberDraftMain('mainsha');
+    await withMls(unread.mlsStub, () => undoFile(unread.file));
+    assert.equal(unread.file.status, 'changed');
+    assert.equal(unread.calls.some((call) => call.name === 'setContents'), false);
+    assert.equal(unread.calls.some((call) => call.name === 'dispose'), false);
+    assert.equal(screen.some((msg) => msg === 'Could not read the published version.'), true);
+    assert.equal(errors.some((line) => line.includes('getHistoryContent returned nothing')), true);
+
+    for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
+      const shortName = status === 'renamed' ? 'next' : 'x';
+      const { file, calls, mlsStub, files } = undoHarness(status, shortName);
+      await withMls(mlsStub, () => undoFile(file));
+      const history = calls.filter((call) => call.name === 'history');
+      const saved = calls.filter((call) => call.name === 'setContents');
+      if (status === 'new') {
+        assert.deepEqual(history, []);
+        assert.deepEqual(saved.map((call) => call.status), ['deleted']);
+        assert.equal(fileKeyOf(file) in files, false);
+      } else if (status === 'renamed') {
+        assert.deepEqual(history.map((call) => `${call.shortName}@${call.ref}`), ['old@mainsha']);
+        assert.deepEqual(saved.map((call) => `${call.shortName}:${call.status}`), ['old:changed', 'next:deleted']);
+        const original = files[fileKeyOf({ project: 1, level: 1, folder: 'mod', shortName: 'old', extension: '.ts' })];
+        assert.equal(original.status, 'nochange');
+        assert.equal(fileKeyOf(file) in files, false);
+        assert.equal(calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
+        assert.equal(calls.some((call) => call.name === 'dispose'), false);
+      } else {
+        assert.deepEqual(history.map((call) => `${call.shortName}@${call.ref}`), [`${shortName}@mainsha`]);
+        assert.deepEqual(saved.map((call) => call.status), ['changed']);
+        assert.equal(file.status, 'nochange');
+        assert.equal(calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
+        assert.equal(calls.some((call) => call.name === 'dispose'), false);
+        assert.equal(fileKeyOf(file) in files, true);
+      }
+    }
+  } finally {
+    document.cookie = previousCookie;
+    console.error = previousError;
+    g.collabMessages = previousScreen;
+  }
 });
