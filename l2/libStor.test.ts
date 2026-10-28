@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deleteFile, undoFile } from '/_102027_/l2/libStor.js';
 import { draftPublishedCommit, rememberDraftMain } from '/_102033_/l2/cbe/studioDraftFiles.js';
+import { rememberCollabMode } from '/_102033_/l2/cbe/studioDraft.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ENTRY = path.join(HERE, 'libStor.ts');
@@ -283,17 +284,27 @@ function undoHarness(status: string, shortName = 'x', history: (ref: string) => 
   return { file, calls, mlsStub, files };
 }
 
-void test('undoFile restores the published version for the four draft statuses and keeps the old path without a cookie', async () => {
+function armStudio(mlsStub: object, on: boolean, draft = 'team-1'): void {
+  (mlsStub as { sites?: { getMode: () => 'studio' | 'production' } }).sites = {
+    getMode: () => (on ? 'studio' : 'production'),
+  };
+  rememberCollabMode(on ? { mode: 'studio', project: 1, draft } : { mode: 'production' });
+}
+
+void test('undoFile restores the published version for the four draft statuses and keeps the old path outside studio', async () => {
   const screen: string[] = [];
   const errors: string[] = [];
   const g = globalThis as { collabMessages?: { add: (msg: string, type: string) => void } };
   const previousScreen = g.collabMessages;
   const previousError = console.error;
-  const previousCookie = document.cookie;
   g.collabMessages = { add: (msg) => { screen.push(msg); } };
   console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
+  rememberCollabMode({ mode: 'production' });
   try {
     assert.equal(draftPublishedCommit(), undefined);
+    assert.doesNotMatch(readFileSync(ENTRY, 'utf8'), /collab-draft/);
+    assert.match(readFileSync(ENTRY, 'utf8'), /activeDraft\(/);
+    assert.match(readFileSync(ENTRY, 'utf8'), /getMode/);
 
     for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
       const shortName = status === 'renamed' ? 'next' : 'x';
@@ -315,19 +326,21 @@ void test('undoFile restores the published version for the four draft statuses a
 
     const github = undoHarness('changed');
     github.mlsStub.stor.others.getDefaultDriver = async () => ({ driverVersion: '4.2.0', getHistoryContent: async () => 'PUBLISHED' });
-    document.cookie = 'collab-draft=team-1';
+    armStudio(github.mlsStub, true);
     await withMls(github.mlsStub, () => undoFile(github.file));
     assert.equal(github.calls.some((call) => call.name === 'history'), false);
     assert.equal(github.calls.some((call) => call.name === 'dispose'), true);
     assert.equal(github.file.status, 'nochange');
 
     const missing = undoHarness('changed');
+    armStudio(missing.mlsStub, true);
     await withMls(missing.mlsStub, () => undoFile(missing.file));
     assert.equal(missing.file.status, 'changed');
     assert.equal(missing.calls.some((call) => call.name === 'history'), false);
     assert.equal(screen.some((msg) => msg === 'The published commit is unknown, so the file stays as it is.'), true);
 
     const unread = undoHarness('changed', 'x', async () => null);
+    armStudio(unread.mlsStub, true);
     rememberDraftMain('mainsha');
     await withMls(unread.mlsStub, () => undoFile(unread.file));
     assert.equal(unread.file.status, 'changed');
@@ -339,6 +352,7 @@ void test('undoFile restores the published version for the four draft statuses a
     for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
       const shortName = status === 'renamed' ? 'next' : 'x';
       const { file, calls, mlsStub, files } = undoHarness(status, shortName);
+      armStudio(mlsStub, true);
       await withMls(mlsStub, () => undoFile(file));
       const history = calls.filter((call) => call.name === 'history');
       const saved = calls.filter((call) => call.name === 'setContents');
@@ -364,7 +378,7 @@ void test('undoFile restores the published version for the four draft statuses a
       }
     }
   } finally {
-    document.cookie = previousCookie;
+    rememberCollabMode({ mode: 'production' });
     console.error = previousError;
     g.collabMessages = previousScreen;
   }

@@ -527,14 +527,25 @@ function isDraftHistoryDriver(value: unknown): value is DraftHistoryDriver {
     return typeof (value as { getHistoryContent?: unknown }).getHistoryContent === 'function';
 }
 
+type SiteMode = 'studio' | 'production';
+
+function siteMode(): SiteMode | undefined {
+    const getMode = (mls.sites as { getMode?: () => SiteMode | undefined } | undefined)?.getMode;
+    return typeof getMode === 'function' ? getMode() : undefined;
+}
+
 async function draftUndoMode(project: number): Promise<DraftUndoMode> {
-    const cookie = typeof document === 'undefined' ? '' : String(document.cookie ?? '');
-    // No draft cookie: keep the pre-draft undo. Do not import the studio module
-    // (this file also runs in the collabmsg host, which has no studio bundle).
-    if (!cookie.includes('collab-draft')) return { kind: 'off' };
+    // Production, or a host that never registered getMode: keep the pre-draft undo.
+    // Do not import the studio module (this file also runs in the collabmsg host,
+    // which has no studio bundle).
+    if (siteMode() !== 'studio') return { kind: 'off' };
     try {
-        const { readDraftCookie, isVmDriver } = await import('/_102033_/l2/cbe/studioDraft.js');
-        if (!readDraftCookie(cookie)) return { kind: 'off' };
+        const { activeDraft, isVmDriver } = await import('/_102033_/l2/cbe/studioDraft.js');
+        const draft = activeDraft();
+        if (!draft) {
+            console.error('[undoFile] studio mode has no active draft');
+            return { kind: 'off' };
+        }
         const others = (mls.stor as { others?: { getDefaultDriver?: (project: number) => unknown } }).others;
         if (!others || typeof others.getDefaultDriver !== 'function') {
             return { kind: 'broken', detail: 'getDefaultDriver is missing' };
