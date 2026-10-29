@@ -344,6 +344,11 @@ function init() {
 }
 init();
 
+function modelFileLabel(storFile: mls.stor.IFileInfo): string {
+    const folder = storFile.folder ? `${storFile.folder}/` : '';
+    return `${storFile.project}/l${storFile.level}/${folder}${storFile.shortName}${storFile.extension}`;
+}
+
 function onMonacoModelCreated(ev: mls.events.IEvent) {
     // console.log('onMonacoModelCreated', ev) // test
     const storFileBase = mls.stor.convertFileReferenceToFile(ev.desc || '');
@@ -353,12 +358,9 @@ function onMonacoModelCreated(ev: mls.events.IEvent) {
 
     storFile.getOrCreateModel().then(async (model: mls.editor.IModelBase) => {
         if (!model) return;
-        // Register model events and hooks
-
-        if (model.originalCRC === undefined) await setOriginalCrc(model);
-        storFile.onAction = (action: mls.stor.IFileInfoAction) => _afterUpdate(storFile, model.model, mapExt[storFile.extension]);
-        storFile.getValueInfo = () => _getValueInfo(model);
-        model.model.onDidChangeContent((e: monaco.editor.IModelContentChangedEvent) => _onModelChange(e, model, storFile));
+        await setModelEventAny(model, storFile);
+    }).catch((err: unknown) => {
+        console.error(`[libModel] ${modelFileLabel(storFile)}: MonacoModelCreated failed`, err);
     });
 }
 
@@ -391,12 +393,19 @@ async function _createModelAnyFile(storFile: mls.stor.IFileInfo) {
 
 }
 
-export async function setModelEventAny(model: mls.editor.IModelBase, storFile: mls.stor.IFileInfo) {
+export async function setModelEventAny(model: IModelBase, storFile: mls.stor.IFileInfo) {
 
     if (!model) return;
-    // Register model events and hooks
+    if (model.listenerBound) return;
+    // Mark before the await so a second call cannot attach another listener.
+    model.listenerBound = true;
 
-    if (model.originalCRC === undefined) await setOriginalCrc(model);
+    try {
+        if (model.originalCRC === undefined) await setOriginalCrc(model);
+    } catch (err) {
+        console.error(`[libModel] ${modelFileLabel(storFile)}: setOriginalCrc failed`, err);
+    }
+
     storFile.onAction = (action: mls.stor.IFileInfoAction) => _afterUpdate(storFile, model.model, mapExt[storFile.extension]);
     storFile.getValueInfo = () => _getValueInfo(model);
     model.model.onDidChangeContent((e: monaco.editor.IModelContentChangedEvent) => _onModelChange(e, model, storFile));
@@ -957,4 +966,5 @@ export class ModelProcessing implements IModelProcessing {
 export interface IModelBase extends mls.editor.IModelBase {
     changeTimeout?: number;
     processing?: IModelProcessing;
+    listenerBound?: true;
 }
