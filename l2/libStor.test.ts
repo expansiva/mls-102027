@@ -291,6 +291,17 @@ function armStudio(mlsStub: object, on: boolean, draft = 'team-1'): void {
   rememberCollabMode(on ? { mode: 'studio', project: 1, draft } : { mode: 'production' });
 }
 
+function retarget(harness: ReturnType<typeof undoHarness>, project: number): void {
+  delete harness.files[fileKeyOf(harness.file)];
+  harness.file.project = project;
+  harness.files[fileKeyOf(harness.file)] = harness.file;
+}
+
+function armSite(mlsStub: object, project: number | undefined, draft = 'team-102047'): void {
+  (mlsStub as { sites?: { getMode: () => 'studio' } }).sites = { getMode: () => 'studio' };
+  rememberCollabMode(project === undefined ? { mode: 'studio', draft } : { mode: 'studio', project, draft });
+}
+
 void test('undoFile restores the published version for the four draft statuses and keeps the old path outside studio', async () => {
   const screen: string[] = [];
   const errors: string[] = [];
@@ -381,5 +392,51 @@ void test('undoFile restores the published version for the four draft statuses a
     rememberCollabMode({ mode: 'production' });
     console.error = previousError;
     g.collabMessages = previousScreen;
+  }
+});
+
+void test('undoFile draft undo applies only to the studio site project', async () => {
+  const errors: string[] = [];
+  const previousError = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(' ')); };
+  try {
+    rememberDraftMain('mainsha');
+
+    const lib = undoHarness('changed', 'bootstrap');
+    retarget(lib, 102033);
+    lib.file.inLocalStorage = true;
+    armSite(lib.mlsStub, 102047);
+    await withMls(lib.mlsStub, () => undoFile(lib.file));
+    assert.equal(lib.calls.some((call) => call.name === 'history'), false);
+    assert.equal(lib.calls.some((call) => call.name === 'setContents'), false);
+    assert.equal(lib.calls.some((call) => call.name === 'setValue'), false);
+    assert.equal(lib.file.status, 'nochange');
+    assert.equal(lib.file.inLocalStorage, false);
+    assert.equal(lib.calls.some((call) => call.name === 'setContent' && call.content === null), true);
+    assert.equal(lib.calls.some((call) => call.name === 'dispose'), true);
+
+    const site = undoHarness('changed', 'page');
+    retarget(site, 102047);
+    armSite(site.mlsStub, 102047);
+    await withMls(site.mlsStub, () => undoFile(site.file));
+    assert.deepEqual(
+      site.calls.filter((call) => call.name === 'history').map((call) => `${call.shortName}@${call.ref}`),
+      ['page@mainsha'],
+    );
+    assert.equal(site.file.status, 'nochange');
+    assert.equal(site.calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
+    assert.equal(site.calls.some((call) => call.name === 'dispose'), false);
+
+    const bare = undoHarness('changed', 'bare');
+    bare.file.inLocalStorage = true;
+    armSite(bare.mlsStub, undefined);
+    await withMls(bare.mlsStub, () => undoFile(bare.file));
+    assert.equal(bare.calls.some((call) => call.name === 'history'), false);
+    assert.equal(bare.file.status, 'nochange');
+    assert.equal(bare.file.inLocalStorage, false);
+    assert.equal(errors.some((line) => line.includes('[undoFile] studio mode has no project')), true);
+  } finally {
+    rememberCollabMode({ mode: 'production' });
+    console.error = previousError;
   }
 });

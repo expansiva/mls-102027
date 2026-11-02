@@ -540,12 +540,19 @@ async function draftUndoMode(project: number): Promise<DraftUndoMode> {
     // which has no studio bundle).
     if (siteMode() !== 'studio') return { kind: 'off' };
     try {
-        const { activeDraft, isVmDriver } = await import('/_102033_/l2/cbe/studioDraft.js');
+        const { activeDraft, isVmDriver, modeState } = await import('/_102033_/l2/cbe/studioDraft.js');
         const draft = activeDraft();
         if (!draft) {
             console.error('[undoFile] studio mode has no active draft');
             return { kind: 'off' };
         }
+        const studioProject = modeState().project;
+        if (typeof studioProject !== 'number') {
+            console.error('[undoFile] studio mode has no project');
+            return { kind: 'off' };
+        }
+        // A library file is not in this site's draft. Undo drops the local copy.
+        if (project !== studioProject) return { kind: 'off' };
         const others = (mls.stor as { others?: { getDefaultDriver?: (project: number) => unknown } }).others;
         if (!others || typeof others.getDefaultDriver !== 'function') {
             return { kind: 'broken', detail: 'getDefaultDriver is missing' };
