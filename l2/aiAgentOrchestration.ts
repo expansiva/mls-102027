@@ -134,8 +134,13 @@ export async function executeBeforePrompt(
     agent: IAgent | IAgentAsync,
     context: mls.msg.ExecutionContext
 ): Promise<void> {
-    for await (const _event of executeBeforePromptStream(agent, context)) {
-        // consume all events silently
+    openAgentChain();
+    try {
+        for await (const _event of executeBeforePromptStream(agent, context)) {
+            // consume all events silently
+        }
+    } finally {
+        closeAgentChain();
     }
 }
 
@@ -155,6 +160,31 @@ function splitJsonAndText(input: string): { jsonText: string; rest: string } {
 const taskControllers = new Map<string, AbortController>();
 const MAX_HOOKS_PER_TURN = 5;
 const runningTasks = new Set<string>();
+
+/** Open agent chains. Independent of `runningTasks`, which leaks on error and cancel. */
+let openAgentChains = 0;
+
+function emitAgentChainRunning(): void {
+    if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+        console.error("[aiAgentOrchestration] collabAgentChain: window.dispatchEvent is missing");
+        return;
+    }
+    window.dispatchEvent(new CustomEvent("collabAgentChain", { detail: { running: openAgentChains } }));
+}
+
+function openAgentChain(): void {
+    openAgentChains += 1;
+    if (openAgentChains === 1) emitAgentChainRunning();
+}
+
+function closeAgentChain(): void {
+    if (openAgentChains === 0) {
+        console.error("[aiAgentOrchestration] agent chain counter is already 0");
+        return;
+    }
+    openAgentChains -= 1;
+    if (openAgentChains === 0) emitAgentChainRunning();
+}
 
 // ── processIntents (streaming) ───────────────────────────────────
 
@@ -541,61 +571,71 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
         return;
     }
 
-    const ia = task.iaCompressed;
-    if (!ia) throw new Error('Task has no AI interaction');
-    if (!ia.queueFrontEnd) throw new Error('Task has no pending hooks');
+    openAgentChain();
+    // processIntents keeps running after this function returns. The chain stays
+    // open until that promise settles (success, throw, or signal.aborted).
+    let handedOff = false;
+    try {
+        const ia = task.iaCompressed;
+        if (!ia) throw new Error('Task has no AI interaction');
+        if (!ia.queueFrontEnd) throw new Error('Task has no pending hooks');
 
-    const firstStep = ia.nextSteps?.[0] as mls.msg.AIAgentStep | undefined;
-    if (!firstStep) throw new Error('No next step available');
-    const agentNameLocal = firstStep.agentName;
-    const agent = await loadAgent(agentNameLocal);
-    if (!agent) throw new Error(`[${agentNameLocal}] createAgent function not found`);
+        const firstStep = ia.nextSteps?.[0] as mls.msg.AIAgentStep | undefined;
+        if (!firstStep) throw new Error('No next step available');
+        const agentNameLocal = firstStep.agentName;
+        const agent = await loadAgent(agentNameLocal);
+        if (!agent) throw new Error(`[${agentNameLocal}] createAgent function not found`);
 
-    runningTasks.add(taskId);
-    emitOrchestrationEvent({ type: 'pooling-start', taskId });
-    await orchestrationStorage.addPooling({
-        taskId,
-        userId: context.task?.owner ?? '',
-        startAt: Date.now().toString()
-    });
+        runningTasks.add(taskId);
+        emitOrchestrationEvent({ type: 'pooling-start', taskId });
+        await orchestrationStorage.addPooling({
+            taskId,
+            userId: context.task?.owner ?? '',
+            startAt: Date.now().toString()
+        });
 
-    const hooksToProcess = ia.queueFrontEnd
-        .filter(h => h.type !== 'pooling')
-        .slice(0, MAX_HOOKS_PER_TURN);
+        const hooksToProcess = ia.queueFrontEnd
+            .filter(h => h.type !== 'pooling')
+            .slice(0, MAX_HOOKS_PER_TURN);
 
-    const intentsFromHooks = (
-        await Promise.all(
-            hooksToProcess.map(async hook => {
-                const resolved = await resolveHookAgent(agent, context, hook);
-                if (!resolved.agent) {
-                    const error = `[${agentName}](continuePoolingTask) ${resolved.error || 'Invalid agent in hook step'}`;
-                    return getHookFailureIntents(context, hook, error);
-                }
+        const intentsFromHooks = (
+            await Promise.all(
+                hooksToProcess.map(async hook => {
+                    const resolved = await resolveHookAgent(agent, context, hook);
+                    if (!resolved.agent) {
+                        const error = `[${agentName}](continuePoolingTask) ${resolved.error || 'Invalid agent in hook step'}`;
+                        return getHookFailureIntents(context, hook, error);
+                    }
 
-                return [
-                    ...(await processIntents2(resolved.agent, context, hook)),
-                    ...getRemoveIntent(context, hook),
-                ];
-            })
-        )
-    ).flat();
+                    return [
+                        ...(await processIntents2(resolved.agent, context, hook)),
+                        ...getRemoveIntent(context, hook),
+                    ];
+                })
+            )
+        ).flat();
 
-    await orchestrationStorage.addOrUpdateTask(task);
-    let intents = intentsFromHooks;
+        await orchestrationStorage.addOrUpdateTask(task);
+        let intents = intentsFromHooks;
 
-    if (intents.length === 0) {
-        intents = await processHookPooling(context);
         if (intents.length === 0) {
-            runningTasks.delete(taskId);
-            await orchestrationStorage.deletePooling(taskId);
-            emitOrchestrationEvent({ type: 'pooling-end', taskId });
-            return;
+            intents = await processHookPooling(context);
+            if (intents.length === 0) {
+                runningTasks.delete(taskId);
+                await orchestrationStorage.deletePooling(taskId);
+                emitOrchestrationEvent({ type: 'pooling-end', taskId });
+                return;
+            }
         }
-    }
 
-    void processIntents(agent, context, intents).finally(() => {
-        emitOrchestrationEvent({ type: 'pooling-end', taskId });
-    });
+        void processIntents(agent, context, intents).finally(() => {
+            emitOrchestrationEvent({ type: 'pooling-end', taskId });
+            closeAgentChain();
+        });
+        handedOff = true;
+    } finally {
+        if (!handedOff) closeAgentChain();
+    }
 }
 
 // ── pauseOrContinueTask ─────────────────────────────────────────
