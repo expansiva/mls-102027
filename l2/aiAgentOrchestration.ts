@@ -164,9 +164,15 @@ const runningTasks = new Set<string>();
 /** Open agent chains. Independent of `runningTasks`, which leaks on error and cancel. */
 let openAgentChains = 0;
 
+let warnedNoWindow = false;
+
 function emitAgentChainRunning(): void {
     if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
-        console.error("[aiAgentOrchestration] collabAgentChain: window.dispatchEvent is missing");
+        // collabmsg host (Node) has no window: nobody listens there, so say it once, not per chain.
+        if (!warnedNoWindow) {
+            warnedNoWindow = true;
+            console.warn("[aiAgentOrchestration] collabAgentChain: window.dispatchEvent is missing; the event is not emitted here");
+        }
         return;
     }
     window.dispatchEvent(new CustomEvent("collabAgentChain", { detail: { running: openAgentChains } }));

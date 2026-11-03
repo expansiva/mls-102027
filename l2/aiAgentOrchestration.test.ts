@@ -115,3 +115,28 @@ test("agent chain counter rises and falls on success, error and cancel", async (
         else (globalThis as { window?: unknown }).window = previousWindow;
     }
 });
+
+test("without window the chain event warns once and never uses console.error", async () => {
+    const previousWindow = (globalThis as { window?: unknown }).window;
+    delete (globalThis as { window?: unknown }).window;
+    const warns: unknown[][] = [];
+    const errors: unknown[][] = [];
+    const warn = console.warn;
+    const error = console.error;
+    console.warn = (...args: unknown[]) => { warns.push(args); };
+    console.error = (...args: unknown[]) => { errors.push(args); };
+    setOrchestrationStorage(storage);
+    try {
+        const done = { agentName: "agentOk", beforePrompt: async () => { } };
+        await executeBeforePrompt(done, context());
+        await executeBeforePrompt(done, context());
+        await executeBeforePrompt(done, context());
+        assert.equal(errors.length, 0, "no console.error for a missing window");
+        assert.equal(warns.length, 1, "one warning for the whole process");
+    } finally {
+        console.warn = warn;
+        console.error = error;
+        setOrchestrationStorage(null);
+        if (previousWindow !== undefined) (globalThis as { window?: unknown }).window = previousWindow;
+    }
+});
