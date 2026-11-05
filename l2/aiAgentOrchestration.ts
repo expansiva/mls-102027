@@ -134,13 +134,8 @@ export async function executeBeforePrompt(
     agent: IAgent | IAgentAsync,
     context: mls.msg.ExecutionContext
 ): Promise<void> {
-    openAgentChain();
-    try {
-        for await (const _event of executeBeforePromptStream(agent, context)) {
-            // consume all events silently
-        }
-    } finally {
-        closeAgentChain();
+    for await (const _event of executeBeforePromptStream(agent, context)) {
+        // consume all events silently
     }
 }
 
@@ -192,6 +187,15 @@ function closeAgentChain(): void {
     if (openAgentChains === 0) emitAgentChainRunning();
 }
 
+async function withAgentChain<T>(work: () => Promise<T>): Promise<T> {
+    openAgentChain();
+    try {
+        return await work();
+    } finally {
+        closeAgentChain();
+    }
+}
+
 // ── processIntents (streaming) ───────────────────────────────────
 
 async function* processIntentsStream(
@@ -233,95 +237,103 @@ async function* _processIntentsStream(
         const oldContextCreateAt = context.message.createAt;
         const isAddMessageAI = currentIntents.some(i => i.type === 'add-message-ai');
 
-        const value = await applyIntentsImpl({
-            userId: context.message.senderId,
-            intents: currentIntents
-        });
-
-        if (!value) throw new Error(`[${agentName}] Error on msgApplyIntents`);
-        if (value.statusCode !== 200) throw new Error(`[${agentName}] Error: ${value.msg || ''}`);
-        if (signal.aborted) return;
-
-        const ret = value as mls.msg.ResponseApplyIntents;
-        context.task = ret.task;
-        if (ret.message) context.message = ret.message;
-        // Persist before notifying: listeners react to 'task-change' synchronously
-        // and resolve via storage.getTask (e.g. getAgentContext). Notifying before
-        // the store is updated makes them read a stale task — which left the second
-        // clarification stuck on "Processing..." until a manual task click.
-        await orchestrationStorage.addOrUpdateTask(ret.task);
-        notifyTaskChange(context, isAddMessageAI ? oldContextCreateAt : undefined);
-
-        // ★ Yield: task criada / intents aplicados
-        yield {
-            type: 'task-created',
-            taskId: ret.task.PK,
-            task: ret.task,
-            message: ret.message
-        };
-        yield {
-            type: 'intents-applied',
-            task: ret.task,
-            message: context.message
-        };
-
-        if (!context.task?.iaCompressed) {
-            yield { type: 'done' };
-            return;
-        }
-
-        runningTasks.add(ret.task.PK);
-
-        await orchestrationStorage.addPooling({
-            taskId: ret.task.PK,
-            userId: context.task?.owner ?? '',
-            startAt: Date.now().toString()
-        });
-
-        yield { type: 'pooling-start', taskId: ret.task.PK };
-
-        if (signal.aborted) return;
-
-        let _hooks = context.task.iaCompressed.queueFrontEnd || [];
-        const hooksToProcess = selectHooksToProcess(_hooks.filter(h => h.type !== 'pooling'));
-
         let newIntents: mls.msg.AgentIntent[] = [];
+        let ret: mls.msg.ResponseApplyIntents | undefined;
 
-        for (const hook of hooksToProcess) {
-            // ★ Yield: hook iniciando
-            yield { type: 'hook-start', hookType: hook.type, stepId: hook.stepId };
+        openAgentChain();
+        try {
+            const value = await applyIntentsImpl({
+                userId: context.message.senderId,
+                intents: currentIntents
+            });
 
-            const resolved = await resolveHookAgent(agent, context, hook);
-            if (!resolved.agent) {
-                const error = `[${agentName}](startNewAiTask) ${resolved.error || 'Invalid agent in hook step'}`;
-                const combined = getHookFailureIntents(context, hook, error);
-                yield { type: 'error', error, stepId: hook.stepId };
-                yield { type: 'hook-done', hookType: hook.type, intents: combined };
-                newIntents.push(...combined);
-                continue;
+            if (!value) throw new Error(`[${agentName}] Error on msgApplyIntents`);
+            if (value.statusCode !== 200) throw new Error(`[${agentName}] Error: ${value.msg || ''}`);
+            if (signal.aborted) return;
+
+            ret = value as mls.msg.ResponseApplyIntents;
+            context.task = ret.task;
+            if (ret.message) context.message = ret.message;
+            // Persist before notifying: listeners react to 'task-change' synchronously
+            // and resolve via storage.getTask (e.g. getAgentContext). Notifying before
+            // the store is updated makes them read a stale task — which left the second
+            // clarification stuck on "Processing..." until a manual task click.
+            await orchestrationStorage.addOrUpdateTask(ret.task);
+            notifyTaskChange(context, isAddMessageAI ? oldContextCreateAt : undefined);
+
+            // ★ Yield: task criada / intents aplicados
+            yield {
+                type: 'task-created',
+                taskId: ret.task.PK,
+                task: ret.task,
+                message: ret.message
+            };
+            yield {
+                type: 'intents-applied',
+                task: ret.task,
+                message: context.message
+            };
+
+            if (!context.task?.iaCompressed) {
+                yield { type: 'done' };
+                return;
             }
 
-            agent = resolved.agent;
+            runningTasks.add(ret.task.PK);
 
-            const hookIntents = await processIntents2(resolved.agent, context, hook);
-            const removeIntents = getRemoveIntent(context, hook);
-            const combined = [...hookIntents, ...removeIntents];
+            await orchestrationStorage.addPooling({
+                taskId: ret.task.PK,
+                userId: context.task?.owner ?? '',
+                startAt: Date.now().toString()
+            });
 
-            // ★ Yield: hook finalizado
-            yield { type: 'hook-done', hookType: hook.type, intents: combined };
+            yield { type: 'pooling-start', taskId: ret.task.PK };
 
-            newIntents.push(...combined);
+            if (signal.aborted) return;
+
+            let _hooks = context.task.iaCompressed.queueFrontEnd || [];
+            const hooksToProcess = selectHooksToProcess(_hooks.filter(h => h.type !== 'pooling'));
+
+            for (const hook of hooksToProcess) {
+                // ★ Yield: hook iniciando
+                yield { type: 'hook-start', hookType: hook.type, stepId: hook.stepId };
+
+                const resolved = await resolveHookAgent(agent, context, hook);
+                if (!resolved.agent) {
+                    const error = `[${agentName}](startNewAiTask) ${resolved.error || 'Invalid agent in hook step'}`;
+                    const combined = getHookFailureIntents(context, hook, error);
+                    yield { type: 'error', error, stepId: hook.stepId };
+                    yield { type: 'hook-done', hookType: hook.type, intents: combined };
+                    newIntents.push(...combined);
+                    continue;
+                }
+
+                agent = resolved.agent;
+
+                const hookIntents = await processIntents2(resolved.agent, context, hook);
+                const removeIntents = getRemoveIntent(context, hook);
+                const combined = [...hookIntents, ...removeIntents];
+
+                // ★ Yield: hook finalizado
+                yield { type: 'hook-done', hookType: hook.type, intents: combined };
+
+                newIntents.push(...combined);
+            }
+
+            await orchestrationStorage.addOrUpdateTask(context.task);
+            if (signal.aborted) return;
+        } finally {
+            closeAgentChain();
         }
-
-        await orchestrationStorage.addOrUpdateTask(context.task);
-        if (signal.aborted) return;
 
         if (newIntents.length < 1) {
             newIntents = await processHookPooling(context);
             if (newIntents.length < 1) {
-                runningTasks.delete(ret.task.PK);
-                await orchestrationStorage.deletePooling(ret.task.PK);
-                yield { type: 'pooling-end', taskId: ret.task.PK };
+                if (ret) {
+                    runningTasks.delete(ret.task.PK);
+                    await orchestrationStorage.deletePooling(ret.task.PK);
+                    yield { type: 'pooling-end', taskId: ret.task.PK };
+                }
                 yield { type: 'done' };
                 return;
             }
@@ -577,34 +589,31 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
         return;
     }
 
-    openAgentChain();
-    // processIntents keeps running after this function returns. The chain stays
-    // open until that promise settles (success, throw, or signal.aborted).
-    let handedOff = false;
-    try {
-        const ia = task.iaCompressed;
-        if (!ia) throw new Error('Task has no AI interaction');
-        if (!ia.queueFrontEnd) throw new Error('Task has no pending hooks');
+    const ia = task.iaCompressed;
+    if (!ia) throw new Error('Task has no AI interaction');
+    if (!ia.queueFrontEnd) throw new Error('Task has no pending hooks');
 
-        const firstStep = ia.nextSteps?.[0] as mls.msg.AIAgentStep | undefined;
-        if (!firstStep) throw new Error('No next step available');
-        const agentNameLocal = firstStep.agentName;
-        const agent = await loadAgent(agentNameLocal);
-        if (!agent) throw new Error(`[${agentNameLocal}] createAgent function not found`);
+    const firstStep = ia.nextSteps?.[0] as mls.msg.AIAgentStep | undefined;
+    if (!firstStep) throw new Error('No next step available');
+    const agentNameLocal = firstStep.agentName;
+    const agent = await loadAgent(agentNameLocal);
+    if (!agent) throw new Error(`[${agentNameLocal}] createAgent function not found`);
 
-        runningTasks.add(taskId);
-        emitOrchestrationEvent({ type: 'pooling-start', taskId });
-        await orchestrationStorage.addPooling({
-            taskId,
-            userId: context.task?.owner ?? '',
-            startAt: Date.now().toString()
-        });
+    runningTasks.add(taskId);
+    emitOrchestrationEvent({ type: 'pooling-start', taskId });
+    await orchestrationStorage.addPooling({
+        taskId,
+        userId: context.task?.owner ?? '',
+        startAt: Date.now().toString()
+    });
 
-        const hooksToProcess = ia.queueFrontEnd
-            .filter(h => h.type !== 'pooling')
-            .slice(0, MAX_HOOKS_PER_TURN);
+    const hooksToProcess = ia.queueFrontEnd
+        .filter(h => h.type !== 'pooling')
+        .slice(0, MAX_HOOKS_PER_TURN);
 
-        const intentsFromHooks = (
+    const intentsFromHooks = hooksToProcess.length === 0
+        ? []
+        : await withAgentChain(async () => (
             await Promise.all(
                 hooksToProcess.map(async hook => {
                     const resolved = await resolveHookAgent(agent, context, hook);
@@ -619,29 +628,24 @@ export async function continuePoolingTask(context: mls.msg.ExecutionContext) {
                     ];
                 })
             )
-        ).flat();
+        ).flat());
 
-        await orchestrationStorage.addOrUpdateTask(task);
-        let intents = intentsFromHooks;
+    await orchestrationStorage.addOrUpdateTask(task);
+    let intents = intentsFromHooks;
 
+    if (intents.length === 0) {
+        intents = await processHookPooling(context);
         if (intents.length === 0) {
-            intents = await processHookPooling(context);
-            if (intents.length === 0) {
-                runningTasks.delete(taskId);
-                await orchestrationStorage.deletePooling(taskId);
-                emitOrchestrationEvent({ type: 'pooling-end', taskId });
-                return;
-            }
-        }
-
-        void processIntents(agent, context, intents).finally(() => {
+            runningTasks.delete(taskId);
+            await orchestrationStorage.deletePooling(taskId);
             emitOrchestrationEvent({ type: 'pooling-end', taskId });
-            closeAgentChain();
-        });
-        handedOff = true;
-    } finally {
-        if (!handedOff) closeAgentChain();
+            return;
+        }
     }
+
+    void processIntents(agent, context, intents).finally(() => {
+        emitOrchestrationEvent({ type: 'pooling-end', taskId });
+    });
 }
 
 // ── pauseOrContinueTask ─────────────────────────────────────────
