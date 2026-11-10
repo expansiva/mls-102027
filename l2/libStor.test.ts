@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deleteFile, undoFile } from '/_102027_/l2/libStor.js';
-import { draftPublishedCommit, rememberDraftMain } from '/_102033_/l2/cbe/studioDraftFiles.js';
+import { deleteFile, undoFile, undoFiles } from '/_102027_/l2/libStor.js';
+import { COLLAB_DRAFT_DISCARDED, COLLAB_DRAFT_RECOUNT, draftPathIsSaved, draftPublishedCommit, forgetDraftPaths, rememberDraftMain, rememberDraftPaths, withDraftUndoBrowserOnly } from '/_102033_/l2/cbe/studioDraftFiles.js';
 import { rememberCollabMode } from '/_102033_/l2/cbe/studioDraft.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -327,6 +327,10 @@ void test('undoFile restores the published version for the four draft statuses a
         assert.equal(calls.some((call) => call.name === 'dispose'), true, status);
         assert.equal(calls.some((call) => call.name === 'setValue'), false, status);
       }
+      if (status === 'changed') {
+        assert.equal(calls.some((call) => call.name === 'setContent' && call.content === null), true, status);
+        assert.equal(calls.some((call) => call.name === 'removePrj'), true, status);
+      }
       if (status === 'new') assert.equal(fileKeyOf(file) in files, false);
       if (status === 'renamed') {
         assert.equal(fileKeyOf({ project: 1, level: 1, folder: 'mod', shortName: 'old', extension: '.ts' }) in files, true);
@@ -334,6 +338,14 @@ void test('undoFile restores the published version for the four draft statuses a
         assert.equal(calls.some((call) => call.name === 'dispose'), false);
       }
     }
+
+    const noModel = undoHarness('changed', 'nomodel');
+    noModel.mlsStub.editor.models = {};
+    await withMls(noModel.mlsStub, () => undoFile(noModel.file));
+    assert.equal(noModel.file.status, 'nochange');
+    assert.equal(noModel.calls.some((call) => call.name === 'setContent' && call.content === null), true);
+    assert.equal(noModel.calls.some((call) => call.name === 'removePrj'), false);
+    assert.equal(noModel.calls.some((call) => call.name === 'dispose'), false);
 
     const github = undoHarness('changed');
     github.mlsStub.stor.others.getDefaultDriver = async () => ({ driverVersion: '4.2.0', getHistoryContent: async () => 'PUBLISHED' });
@@ -343,50 +355,69 @@ void test('undoFile restores the published version for the four draft statuses a
     assert.equal(github.calls.some((call) => call.name === 'dispose'), true);
     assert.equal(github.file.status, 'nochange');
 
-    const missing = undoHarness('changed');
-    armStudio(missing.mlsStub, true);
-    await withMls(missing.mlsStub, () => undoFile(missing.file));
-    assert.equal(missing.file.status, 'changed');
-    assert.equal(missing.calls.some((call) => call.name === 'history'), false);
-    assert.equal(screen.some((msg) => msg === 'The published commit is unknown, so the file stays as it is.'), true);
+    const fetches: { paths: string[] }[] = [];
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: unknown, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { action: string; paths: string[]; ref: string; draft: string };
+      assert.equal(body.action, 'draftRestorePaths');
+      assert.equal(body.ref, 'main');
+      assert.equal(body.draft, 'team-1');
+      fetches.push({ paths: body.paths });
+      return { status: 200, json: async () => ({ statusCode: 200, status: 'restored' }) };
+    }) as typeof fetch;
+    try {
+      const missing = undoHarness('changed');
+      armStudio(missing.mlsStub, true);
+      await withMls(missing.mlsStub, () => undoFile(missing.file));
+      assert.deepEqual(fetches.map((row) => row.paths), [['l1/mod/x.ts']]);
+      assert.equal(missing.file.status, 'nochange');
+      assert.equal(missing.calls.some((call) => call.name === 'history' || call.name === 'setContents'), false);
+      assert.equal(missing.calls.some((call) => call.name === 'dispose'), true);
 
-    const unread = undoHarness('changed', 'x', async () => null);
-    armStudio(unread.mlsStub, true);
-    rememberDraftMain('mainsha');
-    await withMls(unread.mlsStub, () => undoFile(unread.file));
-    assert.equal(unread.file.status, 'changed');
-    assert.equal(unread.calls.some((call) => call.name === 'setContents'), false);
-    assert.equal(unread.calls.some((call) => call.name === 'dispose'), false);
-    assert.equal(screen.some((msg) => msg === 'Could not read the published version.'), true);
-    assert.equal(errors.some((line) => line.includes('getHistoryContent returned nothing')), true);
+      fetches.length = 0;
+      const refused = undoHarness('changed', 'kept');
+      armStudio(refused.mlsStub, true);
+      globalThis.fetch = (async () => ({
+        status: 400,
+        json: async () => ({ statusCode: 400, code: 'NOT_OWNER', msg: 'draft.not_owner' }),
+      })) as typeof fetch;
+      await withMls(refused.mlsStub, () => undoFile(refused.file));
+      assert.equal(refused.file.status, 'changed');
+      assert.equal(refused.calls.some((call) => call.name === 'setContent' || call.name === 'dispose'), false);
+      assert.equal(screen.some((msg) => msg === 'Could not restore the published version.'), true);
+      assert.equal(errors.some((line) => line.includes('draft.not_owner')), true);
 
-    for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
-      const shortName = status === 'renamed' ? 'next' : 'x';
-      const { file, calls, mlsStub, files } = undoHarness(status, shortName);
-      armStudio(mlsStub, true);
-      await withMls(mlsStub, () => undoFile(file));
-      const history = calls.filter((call) => call.name === 'history');
-      const saved = calls.filter((call) => call.name === 'setContents');
-      if (status === 'new') {
-        assert.deepEqual(history, []);
-        assert.deepEqual(saved.map((call) => call.status), ['deleted']);
-        assert.equal(fileKeyOf(file) in files, false);
-      } else if (status === 'renamed') {
-        assert.deepEqual(history.map((call) => `${call.shortName}@${call.ref}`), ['old@mainsha']);
-        assert.deepEqual(saved.map((call) => `${call.shortName}:${call.status}`), ['old:changed', 'next:deleted']);
-        const original = files[fileKeyOf({ project: 1, level: 1, folder: 'mod', shortName: 'old', extension: '.ts' })];
-        assert.equal(original.status, 'nochange');
-        assert.equal(fileKeyOf(file) in files, false);
-        assert.equal(calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
-        assert.equal(calls.some((call) => call.name === 'dispose'), false);
-      } else {
-        assert.deepEqual(history.map((call) => `${call.shortName}@${call.ref}`), [`${shortName}@mainsha`]);
-        assert.deepEqual(saved.map((call) => call.status), ['changed']);
-        assert.equal(file.status, 'nochange');
-        assert.equal(calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
-        assert.equal(calls.some((call) => call.name === 'dispose'), false);
-        assert.equal(fileKeyOf(file) in files, true);
+      globalThis.fetch = previousFetch;
+      globalThis.fetch = (async (_input: unknown, init: { body: string }) => {
+        const body = JSON.parse(init.body) as { paths: string[] };
+        fetches.push({ paths: body.paths });
+        return { status: 200, json: async () => ({ statusCode: 200, status: 'restored' }) };
+      }) as typeof fetch;
+
+      for (const status of ['changed', 'new', 'deleted', 'renamed'] as const) {
+        fetches.length = 0;
+        const shortName = status === 'renamed' ? 'next' : 'x';
+        const { file, calls, mlsStub, files } = undoHarness(status, shortName);
+        armStudio(mlsStub, true);
+        await withMls(mlsStub, () => undoFile(file));
+        assert.equal(calls.some((call) => call.name === 'history' || call.name === 'setContents'), false, status);
+        assert.equal(fetches.length, 1, status);
+        if (status === 'new') {
+          assert.deepEqual(fetches[0].paths, ['l1/mod/x.ts']);
+          assert.equal(fileKeyOf(file) in files, false);
+        } else if (status === 'renamed') {
+          assert.deepEqual(fetches[0].paths, ['l1/mod/next.ts', 'l1/mod/old.ts']);
+          assert.equal(fileKeyOf(file) in files, false);
+          assert.equal(calls.some((call) => call.name === 'setValue'), false);
+        } else {
+          assert.deepEqual(fetches[0].paths, [`l1/mod/${shortName}.ts`]);
+          assert.equal(file.status, 'nochange');
+          assert.equal(calls.some((call) => call.name === 'dispose'), true, status);
+          assert.equal(fileKeyOf(file) in files, true);
+        }
       }
+    } finally {
+      globalThis.fetch = previousFetch;
     }
   } finally {
     rememberCollabMode({ mode: 'production' });
@@ -415,17 +446,25 @@ void test('undoFile draft undo applies only to the studio site project', async (
     assert.equal(lib.calls.some((call) => call.name === 'setContent' && call.content === null), true);
     assert.equal(lib.calls.some((call) => call.name === 'dispose'), true);
 
-    const site = undoHarness('changed', 'page');
-    retarget(site, 102047);
-    armSite(site.mlsStub, 102047);
-    await withMls(site.mlsStub, () => undoFile(site.file));
-    assert.deepEqual(
-      site.calls.filter((call) => call.name === 'history').map((call) => `${call.shortName}@${call.ref}`),
-      ['page@mainsha'],
-    );
-    assert.equal(site.file.status, 'nochange');
-    assert.equal(site.calls.some((call) => call.name === 'setValue' && call.content === 'PUBLISHED'), true);
-    assert.equal(site.calls.some((call) => call.name === 'dispose'), false);
+    const siteFetches: string[][] = [];
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = (async (_input: unknown, init: { body: string }) => {
+      const body = JSON.parse(init.body) as { paths: string[] };
+      siteFetches.push(body.paths);
+      return { status: 200, json: async () => ({ statusCode: 200, status: 'restored' }) };
+    }) as typeof fetch;
+    try {
+      const site = undoHarness('changed', 'page');
+      retarget(site, 102047);
+      armSite(site.mlsStub, 102047);
+      await withMls(site.mlsStub, () => undoFile(site.file));
+      assert.deepEqual(siteFetches, [['l1/mod/page.ts']]);
+      assert.equal(site.calls.some((call) => call.name === 'history' || call.name === 'setContents'), false);
+      assert.equal(site.file.status, 'nochange');
+      assert.equal(site.calls.some((call) => call.name === 'dispose'), true);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
 
     const bare = undoHarness('changed', 'bare');
     bare.file.inLocalStorage = true;
@@ -439,4 +478,113 @@ void test('undoFile draft undo applies only to the studio site project', async (
     rememberCollabMode({ mode: 'production' });
     console.error = previousError;
   }
+});
+
+void test('st67 s2: one draft restore covers saved files, the skipped file, and a folder of files', async () => {
+  const fetches: string[][] = [];
+  const notices: string[] = [];
+  const previousFetch = globalThis.fetch;
+  const host = globalThis as { window?: EventTarget };
+  const previousWindow = host.window;
+  const windowEvents = new EventTarget();
+  windowEvents.addEventListener(COLLAB_DRAFT_RECOUNT, () => { notices.push('recount'); });
+  windowEvents.addEventListener(COLLAB_DRAFT_DISCARDED, () => { notices.push('discarded'); });
+  host.window = windowEvents;
+  globalThis.fetch = (async (_input: unknown, init: { body: string }) => {
+    const body = JSON.parse(init.body) as { paths: string[] };
+    fetches.push(body.paths);
+    return { status: 200, json: async () => ({ statusCode: 200, status: 'restored' }) };
+  }) as typeof fetch;
+  rememberCollabMode({ mode: 'production' });
+  try {
+    const browserOnly = undoHarness('changed', 'local');
+    browserOnly.file.inLocalStorage = true;
+    armStudio(browserOnly.mlsStub, true);
+    await withMls(browserOnly.mlsStub, () => undoFile(browserOnly.file));
+    assert.deepEqual(fetches, []);
+    assert.equal(browserOnly.file.status, 'nochange');
+    assert.equal(browserOnly.file.inLocalStorage, false);
+    assert.deepEqual(notices, ['recount']);
+
+    notices.length = 0;
+    const skipped = undoHarness('nochange', 'saved');
+    skipped.file.inLocalStorage = false;
+    armStudio(skipped.mlsStub, true);
+    await withMls(skipped.mlsStub, () => undoFile(skipped.file));
+    assert.deepEqual(fetches, [['l1/mod/saved.ts']]);
+    assert.equal(skipped.file.status, 'nochange');
+    assert.deepEqual(notices, ['recount', 'discarded']);
+
+    fetches.length = 0;
+    notices.length = 0;
+    const kept = undoHarness('changed', 'kept');
+    kept.file.inLocalStorage = true;
+    rememberDraftPaths(1, ['l1/mod/kept.ts']);
+    armStudio(kept.mlsStub, true);
+    await withMls(kept.mlsStub, () => undoFile(kept.file));
+    assert.deepEqual(fetches, [['l1/mod/kept.ts']]);
+    assert.equal(draftPathIsSaved(1, 'l1/mod/kept.ts'), false);
+    assert.equal(kept.file.status, 'nochange');
+    assert.equal(kept.file.inLocalStorage, false);
+
+    fetches.length = 0;
+    notices.length = 0;
+    const batch = ['a', 'b', 'c'].map((name) => {
+      const harness = undoHarness('changed', name);
+      harness.file.inLocalStorage = false;
+      return harness;
+    });
+    armStudio(batch[0].mlsStub, true);
+    const files = batch.map((harness) => harness.file);
+    for (const file of files) batch[0].files[fileKeyOf(file)] = file;
+    await withMls(batch[0].mlsStub, () => undoFiles(files));
+    assert.equal(fetches.length, 1);
+    assert.deepEqual(fetches[0], ['l1/mod/a.ts', 'l1/mod/b.ts', 'l1/mod/c.ts']);
+    assert.deepEqual(notices, ['recount', 'discarded']);
+    assert.equal(files.every((file) => file.status === 'nochange'), true);
+
+    fetches.length = 0;
+    notices.length = 0;
+    const locals = ['d', 'e', 'f'].map((name) => {
+      const harness = undoHarness('changed', name);
+      harness.file.inLocalStorage = true;
+      return harness;
+    });
+    armStudio(locals[0].mlsStub, true);
+    await withDraftUndoBrowserOnly(() => withMls(locals[0].mlsStub, async () => {
+      for (const harness of locals) await undoFile(harness.file);
+    }));
+    assert.deepEqual(fetches, []);
+    assert.deepEqual(notices, []);
+    assert.equal(locals.every((harness) => harness.file.status === 'nochange' && harness.file.inLocalStorage === false), true);
+  } finally {
+    forgetDraftPaths(1, ['l1/mod/kept.ts']);
+    host.window = previousWindow;
+    globalThis.fetch = previousFetch;
+    rememberCollabMode({ mode: 'production' });
+  }
+});
+
+void test('st67 s2: folder and sync loops send one undoFiles call', () => {
+  const tree = readFileSync(path.resolve(HERE, '../../mls-100555/l2/pluginExplore/mlsFileTree.ts'), 'utf8');
+  const tree2 = readFileSync(path.resolve(HERE, '../../mls-100555/l2/pluginExplore/mlsFileTree2.ts'), 'utf8');
+  const save = readFileSync(path.resolve(HERE, '../../mls-100554/l2/serviceSave.ts'), 'utf8');
+  const stor = readFileSync(ENTRY, 'utf8');
+  const folder = (src: string) => {
+    const start = src.indexOf('async undoAllByFolders');
+    const end = src.indexOf('private ', start + 10);
+    return src.slice(start, end);
+  };
+  assert.match(folder(tree), /await undoFiles\(batch\)/);
+  assert.doesNotMatch(folder(tree), /await undoFile\(/);
+  assert.match(folder(tree2), /await undoFiles\(batch\)/);
+  assert.doesNotMatch(folder(tree2), /await undoFile\(/);
+  const syncAt = save.indexOf('private async forceSync');
+  const sync = save.slice(syncAt, save.indexOf('private STORAGE_KEY', syncAt));
+  assert.match(sync, /await undoFiles\(obj\)/);
+  assert.doesNotMatch(sync, /await undoFile\(/);
+  const allAt = stor.indexOf('export async function undoAllFiles');
+  const all = stor.slice(allAt, stor.indexOf('function isNewNameValid', allAt));
+  assert.match(all, /await undoFiles\(files\)/);
+  assert.doesNotMatch(all, /await undoFile\(/);
 });

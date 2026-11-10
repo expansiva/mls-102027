@@ -279,20 +279,65 @@ export async function cloneAllFiles(storFile: mls.stor.IFileInfo, newProject: nu
 }
 
 export async function undoFile(storFile: mls.stor.IFileInfo, removeProject: boolean = true): Promise<void> {
-
-    storFile.getValueInfo = undefined;
-
-    if (storFile.status === 'nochange' && !storFile.inLocalStorage) {
+    const draft = await draftUndoMode(storFile.project);
+    if (draft.kind === 'broken') {
+        storFile.getValueInfo = undefined;
+        showUndoError('driver', draft.detail);
         return;
     }
+    if (draft.kind === 'on') {
+        const { draftUndoBrowserOnly } = await import('/_102033_/l2/cbe/studioDraftFiles.js');
+        if (!draftUndoBrowserOnly()) {
+            // `nochange` without a local copy is the saved file the old code skipped.
+            await undoFilePublished(storFile, draft.slug);
+            return;
+        }
+    }
 
-    const draft = await draftUndoMode(storFile.project);
+    await undoFileLocal(storFile, draft.kind === 'on' ? false : removeProject);
+}
+
+/** One restore for every file. Callers that loop extensions or a folder use this, not one undo per file. */
+export async function undoFiles(files: readonly mls.stor.IFileInfo[]): Promise<void> {
+    const present = files.filter((file) => Boolean(file));
+    if (present.length === 0) return;
+    const project = present[0].project;
+    const same = present.filter((file) => file.project === project);
+    if (same.length !== present.length) {
+        console.error('[undoFile] undoFiles was given files from more than one project');
+    }
+    const draft = await draftUndoMode(project);
     if (draft.kind === 'broken') {
         showUndoError('driver', draft.detail);
         return;
     }
     if (draft.kind === 'on') {
-        await undoFilePublished(storFile, draft.driver);
+        const { draftUndoBrowserOnly } = await import('/_102033_/l2/cbe/studioDraftFiles.js');
+        if (!draftUndoBrowserOnly()) {
+            await undoDraftGroup(same, draft.slug);
+            return;
+        }
+    }
+    for (const file of same) await undoFileLocal(file, false);
+}
+
+export async function undoAllFiles(storFile: mls.stor.IFileInfo): Promise<void> {
+    const files: mls.stor.IFileInfo[] = [];
+    for (const ext of ['.ts', '.html', '.less', '.test.ts', '.defs.ts']) {
+        const key = mls.stor.getKeyToFiles(storFile.project, storFile.level, storFile.shortName, storFile.folder, ext);
+        if (!mls.stor.files[key]) continue;
+        files.push(mls.stor.files[key]);
+    }
+    await undoFiles(files);
+    await mls.stor.localDB.removePrjInfo(storFile.project);
+    const { createAllModels } = await import('/_102027_/l2/libModel.js');
+    createAllModels(storFile, true, false, false)
+}
+
+async function undoFileLocal(storFile: mls.stor.IFileInfo, removeProject: boolean): Promise<void> {
+    storFile.getValueInfo = undefined;
+
+    if (storFile.status === 'nochange' && !storFile.inLocalStorage) {
         return;
     }
 
@@ -327,33 +372,106 @@ export async function undoFile(storFile: mls.stor.IFileInfo, removeProject: bool
         await mls.stor.localStor.setContent(storFile, { contentType: 'string', content: null });
     }
 
-    const keyToModel = mls.editor.getKeyModel(storFile.project, storFile.shortName, storFile.folder, storFile.level);
-    if (!mls.editor.models[keyToModel]) return;
+    // No open model: stop here. The old undo returned before removePrjInfo.
+    if (!disposeOpenModel(storFile)) return;
 
+    if (removeProject && storFile) await mls.stor.localDB.removePrjInfo(storFile.project);
+}
+
+function disposeOpenModel(storFile: mls.stor.IFileInfo): boolean {
+    const keyToModel = mls.editor.getKeyModel(storFile.project, storFile.shortName, storFile.folder, storFile.level);
+    if (!mls.editor.models[keyToModel]) return false;
     const prop = mapExtUndo[storFile.extension];
     if (prop && mls.editor.models[keyToModel]?.[prop]) {
         mls.editor.models[keyToModel][prop]?.model.dispose();
         delete mls.editor.models[keyToModel][prop];
     }
-
-    if (removeProject && storFile) await mls.stor.localDB.removePrjInfo(storFile.project);
-
+    return true;
 }
 
-export async function undoAllFiles(storFile: mls.stor.IFileInfo): Promise<void> {
+function draftShortPath(storFile: mls.stor.IFileInfo): string {
+    const folder = storFile.folder ? `${storFile.folder}/` : '';
+    return `l${storFile.level}/${folder}${storFile.shortName}${storFile.extension}`;
+}
 
-    for await (let ext of ['.ts', '.html', '.less', '.test.ts', '.defs.ts']) {
-
-        const key = mls.stor.getKeyToFiles(storFile.project, storFile.level, storFile.shortName, storFile.folder, ext);
-
-        if (!mls.stor.files[key]) continue;
-        await undoFile(mls.stor.files[key], false);
-
+async function renamedOriginPath(storFile: mls.stor.IFileInfo): Promise<string | undefined> {
+    if (storFile.status !== 'renamed') return undefined;
+    const db = mls.stor.localDB as { getContentInfoOrNull?: () => Promise<mls.stor.IFileInfoValue | null | undefined> };
+    const reader = db?.getContentInfoOrNull;
+    if (typeof reader !== 'function') {
+        console.error(`[undoFile] ${storFile.shortName}: published name is missing`);
+        return undefined;
     }
+    let info: mls.stor.IFileInfoValue | null | undefined;
+    try {
+        info = await reader();
+    } catch (err) {
+        console.error(`[undoFile] ${storFile.shortName}: ${undoErrorText(err)}`);
+        return undefined;
+    }
+    if (!info?.originalProject || !info.originalShortName) {
+        console.error(`[undoFile] ${storFile.shortName}: published name is missing`);
+        return undefined;
+    }
+    if (info.originalProject !== storFile.project) {
+        console.error(`[undoFile] ${storFile.shortName}: published name is in another project`);
+        return undefined;
+    }
+    const folder = info.originalFolder || storFile.folder;
+    const folderPart = folder ? `${folder}/` : '';
+    return `l${storFile.level}/${folderPart}${info.originalShortName}${storFile.extension}`;
+}
 
-    await mls.stor.localDB.removePrjInfo(storFile.project);
-    const { createAllModels } = await import('/_102027_/l2/libModel.js');
-    createAllModels(storFile, true, false, false)
+function fileNeedsDraftRestore(storFile: mls.stor.IFileInfo, saved: boolean): boolean {
+    if (storFile.status === 'nochange' && !storFile.inLocalStorage) return true;
+    if (saved) return true;
+    if (storFile.inLocalStorage) return false;
+    return storFile.status === 'changed' || storFile.status === 'deleted' || storFile.status === 'renamed' || storFile.status === 'new';
+}
+
+async function undoDraftGroup(files: readonly mls.stor.IFileInfo[], slug: string): Promise<void> {
+    const { draftPathIsSaved, requestDraftRecount, undoDraftPaths } = await import('/_102033_/l2/cbe/studioDraftFiles.js');
+    const project = files[0].project;
+    const savedFiles: mls.stor.IFileInfo[] = [];
+    const localFiles: mls.stor.IFileInfo[] = [];
+    for (const file of files) {
+        file.getValueInfo = undefined;
+        if (fileNeedsDraftRestore(file, draftPathIsSaved(project, draftShortPath(file)))) savedFiles.push(file);
+        else localFiles.push(file);
+    }
+    if (savedFiles.length === 0) {
+        for (const file of localFiles) await undoFileLocal(file, false);
+        if (localFiles.length > 0) requestDraftRecount(project);
+        return;
+    }
+    const paths: string[] = [];
+    for (const file of savedFiles) {
+        const path = draftShortPath(file);
+        if (!paths.includes(path)) paths.push(path);
+        const origin = await renamedOriginPath(file);
+        if (origin && !paths.includes(origin)) paths.push(origin);
+    }
+    try {
+        await undoDraftPaths(project, slug, paths, async () => {
+            for (const file of savedFiles) await clearRestoredFile(file);
+            for (const file of localFiles) await undoFileLocal(file, false);
+        });
+    } catch (err) {
+        showUndoError('restore', undoErrorText(err));
+    }
+}
+
+async function clearRestoredFile(storFile: mls.stor.IFileInfo): Promise<void> {
+    if (storFile.status === 'new' || storFile.status === 'renamed') {
+        await deleteFileSystem(storFile);
+        return;
+    }
+    const untouched = storFile.status === 'nochange' && !storFile.inLocalStorage;
+    if (untouched) {
+        disposeOpenModel(storFile);
+        return;
+    }
+    await undoFileLocal(storFile, false);
 }
 
 function isNewNameValid(newShortName: string): boolean {
@@ -469,13 +587,14 @@ async function undoFileRenamed(storFile: mls.stor.IFileInfo) {
     }
 }
 
-// Draft undo restores the published blob. The open Monaco model keeps that text;
-// disposing it (the non-draft path) would show the draft again on the next read.
+// Draft undo restores the path on the server, then drops the browser copy.
+// Disposing the open model is safe after that: the next read is the published file.
 
 const UNDO_TEXT = {
     en: {
         read: 'Could not read the published version.',
         save: 'Could not write the published version to the draft.',
+        restore: 'Could not restore the published version.',
         main: 'The published commit is unknown, so the file stays as it is.',
         name: 'The published name is missing, so the file stays as it is.',
         driver: 'The draft driver failed, so the file stays as it is.',
@@ -483,6 +602,7 @@ const UNDO_TEXT = {
     pt: {
         read: 'Não foi possível ler a versão publicada.',
         save: 'Não foi possível gravar a versão publicada no rascunho.',
+        restore: 'Não foi possível restaurar a versão publicada.',
         main: 'O commit publicado é desconhecido, então o arquivo permanece como está.',
         name: 'O nome publicado está ausente, então o arquivo permanece como está.',
         driver: 'O driver do rascunho falhou, então o arquivo permanece como está.',
@@ -498,7 +618,7 @@ interface DraftHistoryDriver {
 
 type DraftUndoMode =
     | { kind: 'off' }
-    | { kind: 'on'; driver: DraftHistoryDriver }
+    | { kind: 'on'; driver: DraftHistoryDriver; slug: string }
     | { kind: 'broken'; detail: string };
 
 function undoErrorText(err: unknown): string {
@@ -560,204 +680,14 @@ async function draftUndoMode(project: number): Promise<DraftUndoMode> {
         const driver = await others.getDefaultDriver(project);
         if (!isVmDriver(driver as { driverVersion?: string } | null | undefined)) return { kind: 'off' };
         if (!isDraftHistoryDriver(driver)) return { kind: 'broken', detail: 'getHistoryContent is missing' };
-        return { kind: 'on', driver };
+        return { kind: 'on', driver, slug: draft };
     } catch (err) {
         return { kind: 'broken', detail: undoErrorText(err) };
     }
 }
 
-async function publishedText(driver: DraftHistoryDriver, fileInfo: mls.stor.IFileInfo, main: string): Promise<string | undefined> {
-    let content: string | null;
-    try {
-        content = await driver.getHistoryContent(fileInfo, main);
-    } catch (err) {
-        showUndoError('read', undoErrorText(err));
-        return undefined;
-    }
-    if (typeof content !== 'string') {
-        showUndoError('read', 'getHistoryContent returned nothing');
-        return undefined;
-    }
-    return content;
-}
-
-function contentsRejected(result: unknown): boolean {
-    if (result === false || result === undefined || result === null) return true;
-    if (!Array.isArray(result)) return false;
-    return result.some((row) => {
-        if (typeof row !== 'object' || row === null) return false;
-        return (row as { result?: unknown }).result === false;
-    });
-}
-
-async function saveDraftContents(files: mls.stor.IFileInfo[]): Promise<boolean> {
-    if (typeof mls.stor.setContents !== 'function') {
-        showUndoError('save', 'setContents is missing');
-        return false;
-    }
-    try {
-        const saved = await mls.stor.setContents(files, null);
-        if (contentsRejected(saved)) {
-            showUndoError('save', 'setContents rejected the write');
-            return false;
-        }
-        return true;
-    } catch (err) {
-        showUndoError('save', undoErrorText(err));
-        return false;
-    }
-}
-
-function fileKeyOf(storFile: mls.stor.IFileInfo): string {
-    return mls.stor.getKeyToFiles(storFile.project, storFile.level, storFile.shortName, storFile.folder, storFile.extension);
-}
-
-async function putPublishedContent(storFile: mls.stor.IFileInfo, published: string): Promise<void> {
-    const value: mls.stor.IFileInfoValue = { contentType: 'string', content: published };
-    storFile.inLocalStorage = true;
-    await mls.stor.localStor.setContent(storFile, value);
-    storFile.getValueInfo = () => Promise.resolve(value);
-    // `deleted` would make setContents remove the path. A write needs any other status.
-    storFile.status = 'changed';
-}
-
-function finishPublished(storFile: mls.stor.IFileInfo): void {
-    storFile.status = 'nochange';
-    storFile.inLocalStorage = false;
-    storFile.hasError = false;
-}
-
-async function showPublished(storFile: mls.stor.IFileInfo, published: string): Promise<void> {
-    let crcSrc = published;
-    if (storFile.extension === '.less') {
-        try {
-            const { removeTokensFromSource } = await import('/_102027_/l2/libCompileStyle.js');
-            crcSrc = removeTokensFromSource(published).trim();
-        } catch (err) {
-            console.error(`[undoFile] less crc: ${undoErrorText(err)}`);
-        }
-    }
-    const key = mls.editor.getKeyModel(storFile.project, storFile.shortName, storFile.folder, storFile.level);
-    const bucket = mls.editor.models[key];
-    if (!bucket) return;
-    const prop = mapExtUndo[storFile.extension];
-    const slot = prop ? bucket[prop] : undefined;
-    if (!slot?.model || typeof slot.model.setValue !== 'function') {
-        console.error(`[undoFile] ${storFile.shortName}: open model has no setValue`);
-        return;
-    }
-    slot.model.setValue(published);
-    if (typeof mls.common?.crc?.crc32 === 'function') slot.originalCRC = mls.common.crc.crc32(crcSrc).toString(16);
-}
-
-async function undoFilePublished(storFile: mls.stor.IFileInfo, driver: DraftHistoryDriver): Promise<void> {
-    const { draftPublishedCommit } = await import('/_102033_/l2/cbe/studioDraftFiles.js');
-    const main = draftPublishedCommit();
-    if (!main) {
-        showUndoError('main', 'draftDiff did not store main');
-        return;
-    }
-    if (storFile.status === 'new') {
-        const previous = storFile.status;
-        storFile.status = 'deleted';
-        const saved = await saveDraftContents([storFile]);
-        if (!saved) {
-            storFile.status = previous;
-            return;
-        }
-        await deleteFileSystem(storFile);
-        return;
-    }
-    if (storFile.status === 'renamed') {
-        await undoPublishedRenamed(storFile, driver, main);
-        return;
-    }
-    const published = await publishedText(driver, storFile, main);
-    if (published === undefined) return;
-    const key = fileKeyOf(storFile);
-    const wasIn = Object.prototype.hasOwnProperty.call(mls.stor.files, key);
-    const previous = storFile.status;
-    mls.stor.files[key] = storFile;
-    await putPublishedContent(storFile, published);
-    const saved = await saveDraftContents([storFile]);
-    if (!saved) {
-        storFile.status = previous;
-        if (!wasIn) delete mls.stor.files[key];
-        return;
-    }
-    await mls.stor.localStor.setContent(storFile, { contentType: 'string', content: null });
-    finishPublished(storFile);
-    await showPublished(storFile, published);
-}
-
-function publishedOrigin(storFile: mls.stor.IFileInfo): Promise<mls.stor.IFileInfoValue> {
-    const db = mls.stor.localDB as { getContentInfoOrNull?: unknown };
-    const reader = db?.getContentInfoOrNull;
-    if (!storFile.getValueInfo && typeof reader === 'function') {
-        storFile.getValueInfo = reader as mls.stor.IFileInfo['getValueInfo'];
-    }
-    return storFile.getValueInfo ? storFile.getValueInfo() : Promise.resolve({} as mls.stor.IFileInfoValue);
-}
-
-async function undoPublishedRenamed(storFile: mls.stor.IFileInfo, driver: DraftHistoryDriver, main: string): Promise<void> {
-    const info = await publishedOrigin(storFile);
-    if (!info.originalProject || !info.originalShortName) {
-        showUndoError('name', storFile.shortName);
-        return;
-    }
-    const originalFolder = info.originalFolder || storFile.folder;
-    const originalKey = mls.stor.getKeyToFiles(info.originalProject, storFile.level, info.originalShortName, originalFolder, storFile.extension);
-    const probe: mls.stor.IFileInfo = {
-        ...storFile,
-        project: info.originalProject,
-        shortName: info.originalShortName,
-        folder: originalFolder,
-        status: 'changed',
-    };
-    const published = await publishedText(driver, probe, main);
-    if (published === undefined) return;
-
-    const existed = Boolean(mls.stor.files[originalKey]);
-    if (!existed) {
-        const created = await mls.stor.addOrUpdateFile({
-            project: info.originalProject,
-            level: storFile.level,
-            shortName: info.originalShortName,
-            extension: storFile.extension,
-            versionRef: '0',
-            folder: originalFolder,
-        });
-        if (!created && !mls.stor.files[originalKey]) {
-            showUndoError('save', 'addOrUpdateFile did not restore the published name');
-            return;
-        }
-    }
-    const original = mls.stor.files[originalKey] ?? probe;
-    await putPublishedContent(original, published);
-    const previous = storFile.status;
-    storFile.status = 'deleted';
-    const saved = await saveDraftContents(original.project === storFile.project ? [original, storFile] : [original]);
-    if (!saved) {
-        storFile.status = previous;
-        if (!existed) delete mls.stor.files[originalKey];
-        return;
-    }
-    if (original.project !== storFile.project) {
-        const removed = await saveDraftContents([storFile]);
-        if (!removed) {
-            storFile.status = previous;
-            return;
-        }
-    }
-    await mls.stor.localStor.setContent(original, { contentType: 'string', content: null });
-    finishPublished(original);
-    await showPublished(original, published);
-    await showPublished(storFile, published);
-    const newKey = fileKeyOf(storFile);
-    if (newKey !== originalKey && mls.stor.files[newKey]) {
-        await mls.stor.localStor.setContent(mls.stor.files[newKey], { contentType: 'string', content: null });
-        delete mls.stor.files[newKey];
-    }
+async function undoFilePublished(storFile: mls.stor.IFileInfo, slug: string): Promise<void> {
+    await undoDraftGroup([storFile], slug);
 }
 
 //---------INTERFACE---------
