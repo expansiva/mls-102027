@@ -137,6 +137,7 @@ void test('deleteFile without the capability keeps the Studio trash path', async
   await withMls({
     editor: editorStub(),
     common: { crc: { crc32: () => 0 } },
+    events: { fireFileAction: () => undefined },
     stor: {
       files: {},
       getKeyToFiles: () => 'k',
@@ -154,6 +155,7 @@ void test('deleteFile marks deleted after setContent even when the host write pr
   await withMls({
     editor: editorStub(),
     common: { crc: { crc32: () => 0 } },
+    events: { fireFileAction: () => undefined },
     stor: {
       files: {},
       getKeyToFiles: () => 'k',
@@ -173,6 +175,7 @@ void test('deleteFile marks deleted when setContent does not touch status (brows
   await withMls({
     editor: editorStub(),
     common: { crc: { crc32: () => 0 } },
+    events: { fireFileAction: () => undefined },
     stor: {
       files: {},
       getKeyToFiles: () => 'k',
@@ -180,6 +183,32 @@ void test('deleteFile marks deleted when setContent does not touch status (brows
     },
   }, () => deleteFile(file));
   assert.equal(file.status, 'deleted');
+});
+
+void test('deleteFile keeps a binary file as a Blob in the trash, without a text CRC', async () => {
+  const bytes = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+  const file = stubFile('nochange', {
+    level: 3, folder: 'tarefas/assets', shortName: 'logo', extension: '.png',
+    getValueInfo: async () => ({}),
+    getContent: async () => bytes,
+  });
+  let written: { content?: unknown; contentType?: string; originalCRC?: string } | null = null;
+  let crcCalls = 0;
+  await withMls({
+    editor: editorStub(),
+    common: { crc: { crc32: () => { crcCalls += 1; return 0; } } },
+    events: { fireFileAction: () => undefined },
+    stor: {
+      files: {},
+      getKeyToFiles: () => 'k',
+      localStor: { setContent: async (_f: unknown, value: typeof written) => { written = value; } },
+    },
+  }, () => deleteFile(file));
+  assert.equal(file.status, 'deleted');
+  assert.equal(written!.content, bytes);
+  assert.equal(written!.contentType, 'blob');
+  assert.equal(written!.originalCRC, undefined);
+  assert.equal(crcCalls, 0);
 });
 
 void test('deleteFile with status new hard-deletes via setContent null and does not stay in the index', async () => {

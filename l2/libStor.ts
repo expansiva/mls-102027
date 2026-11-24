@@ -127,14 +127,22 @@ export async function deleteFile(storFile: mls.stor.IFileInfo): Promise<void> {
     if (storFile.getValueInfo) {
         let valueInfo = mls.editor.models[keyToModel] ? await storFile.getValueInfo() : {} as mls.stor.IFileInfoValue;
         if (!valueInfo.content) {
-            const src = await storFile.getContent() as string;
-            valueInfo = {
-                content: src,
-                contentType: 'string',
-                originalShortName: storFile.shortName,
-                originalProject: storFile.project,
-                originalCRC: mls.common.crc.crc32(src).toString(16)
-            }
+            const src = await storFile.getContent();
+            // Binary files (l3 assets) come back as a Blob: keep the bytes, no text CRC.
+            valueInfo = typeof src === 'string'
+                ? {
+                    content: src,
+                    contentType: 'string',
+                    originalShortName: storFile.shortName,
+                    originalProject: storFile.project,
+                    originalCRC: mls.common.crc.crc32(src).toString(16)
+                }
+                : {
+                    content: src,
+                    contentType: 'blob',
+                    originalShortName: storFile.shortName,
+                    originalProject: storFile.project,
+                };
         }
         await mls.stor.localStor.setContent(storFile, valueInfo);
     }
